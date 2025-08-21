@@ -54,4 +54,4 @@ Hệ thống hỗ trợ người dùng tra cứu kết quả, phân tích tần 
 
 ## 🎥 Demo Video
 
-[![Watch the video](https://img.youtube.com/vi/E4EE04ItZ1U/0.jpg)](https://youtu.be/E4EE04ItZ1U)
+[![Click to watch demo](https://img.youtube.com/vi/E4EE04ItZ1U/0.jpg)](https://youtu.be/E4EE04ItZ1U)
