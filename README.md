@@ -50,3 +50,8 @@ Hệ thống hỗ trợ người dùng tra cứu kết quả, phân tích tần 
 ├── .env                     # Biến môi trường (DB_URL, SECRET_KEY, ...)
 └── README.md                # Tài liệu hướng dẫn
 
+
+
+## 🎥 Demo Video
+
+[![Watch the video](https://img.youtube.com/vi/E4EE04ItZ1U/0.jpg)](https://youtu.be/E4EE04ItZ1U)
