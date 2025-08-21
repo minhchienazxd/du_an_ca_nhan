@@ -1,0 +1,51 @@
+.register-container {
+    width: 350px;
+    margin: 60px auto;
+    padding: 30px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background-color: #f9f9f9;
+    text-align: center;
+}
+
+.register-form input {
+    width: 90%;
+    padding: 10px;
+    margin: 10px 0;
+    box-sizing: border-box;
+}
+
+button {
+    padding: 10px 20px;
+    margin-top: 10px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+button:hover {
+    background-color: #218838;
+}
+
+.otp-section {
+    display: none;
+    margin-top: 20px;
+}
+
+.otp-section input {
+    width: 70%;
+    margin-bottom: 10px;
+}
+
+.notice {
+    color: green;
+    font-weight: bold;
+    margin-top: 15px;
+}
+
+.error {
+    color: red;
+    margin-top: 10px;
+}

@@ -1,0 +1,51 @@
+=<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Tạo tài khoản</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dang_ky.css') }}">
+</head>
+<body>
+    <div class="register-container">
+        <h1>Tạo tài khoản</h1>
+        <form method="POST" class="register-form" onsubmit="return handleRegister(event)">
+            <input type="text" name="name" placeholder="Họ và tên" required>
+            <input type="text" name="phone" placeholder="Số điện thoại" required>
+            <input type="password" name="password" placeholder="Mật khẩu" required>
+            <button type="button" onclick="window.location.href='/'">Quay lại trang chủ</button>
+
+            <!-- Phần OTP -->
+            <div id="otp-section" class="otp-section">
+                <input type="text" name="otp" placeholder="Nhập mã xác thực (OTP)">
+                <button type="submit">Xác nhận</button>
+            </div>
+
+            <!-- Nút tạo tài khoản sẽ chuyển sang yêu cầu mã OTP -->
+            <button type="button" onclick="sendOTP()">Tạo tài khoản</button>
+
+            {% if error %}
+              <p class="error">{{ error }}</p>
+            {% endif %}
+            {% if notice %}
+              <p class="notice">{{ notice }}</p>
+            {% endif %}
+        </form>
+    </div>
+
+    <script>
+        function sendOTP() {
+            // Giả lập gửi OTP
+            alert("Mã OTP đã được gửi đến số điện thoại!");
+
+            // Ẩn nút tạo tài khoản, hiện ô nhập OTP
+            document.getElementById("otp-section").style.display = "block";
+        }
+
+        function handleRegister(event) {
+            // Có thể thêm logic kiểm tra OTP ở đây trước khi submit
+            return true; // Cho phép submit form
+        }
+    </script>
+    
+</body>
+</html>

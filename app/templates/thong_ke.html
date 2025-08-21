@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Thống kê lô tô</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='thong_ke.css') }}">
+</head>
+<body>
+
+  <h1>Thống kê lô tô</h1>
+
+  <form method="get" action="/thong-ke">
+    <label>Từ ngày:</label>
+    <input type="date" name="from" required>
+    <label>Đến ngày:</label>
+    <input type="date" name="to" required>
+    <button type="submit">Lọc</button>
+    <a href="/" class="back-btn">Quay lại trang chủ</a>
+  </form>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th class="ngay">Ngày</th>
+          {% for i in range(100) %}
+            <th>{{ "%02d"|format(i) }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data %}
+          <tr>
+            <td class="ngay">{{ row.date }}</td>
+            {% for i in range(100) %}
+              {% set so = "%02d"|format(i) %}
+              {% set count = row.counts.get(so, 0) %}
+              <td class="
+                  {% if so in row.db %}db{% elif count >= 2 %}nhay-2{% elif count == 1 %}nhay-1{% else %}nhay-0{% endif %}
+              ">
+                {% if count >= 2 %}{{ count }}{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html>

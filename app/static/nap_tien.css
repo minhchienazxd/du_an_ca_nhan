@@ -1,0 +1,103 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  padding: 20px;
+  margin: 0;
+}
+
+h1, h2 {
+  text-align: center;
+  color: #333;
+}
+
+.bank-container {
+  width: 400px;            /* kích thước hình vuông lớn */
+  height: 400px;
+  border: 2px solid #333;
+  margin: 0 auto;
+  padding: 10px;
+  box-sizing: border-box;
+  background: white;
+  border-radius: 16px;
+  overflow-y: auto;
+}
+
+.bank-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
+  height: 100%;
+}
+
+.bank-item {
+  width: 80px;
+  height: 80px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-align: center;
+  font-size: 10px;
+  padding: 5px;
+  transition: 0.3s;
+}
+
+.bank-item:hover {
+  background: #e0f0ff;
+  transform: scale(1.05);
+}
+
+.bank-item img.bank-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  margin-bottom: 4px;
+}
+
+
+#payment-methods {
+  max-width: 400px;
+  margin: 30px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+#payment-methods button {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+#payment-methods button:hover {
+  background-color: #0056b3;
+}
+
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 8px;
+  margin: 8px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+#qr-form img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 15px auto;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng nhập</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dang_nhap.css') }}">
+</head>
+<body>
+<div class="login-container">
+    <h1>Đăng nhập</h1>
+
+    {% if session.user %}
+        <div class="user-info">
+            <img src="{{ session.user.picture }}" alt="Avatar" class="avatar">
+            <div class="name-balance">
+                <h2>{{ session.user.name }}</h2>
+                <p class="balance">Số dư: {{ session.user.balance or 0 }}đ</p>
+            </div>
+            <a href="{{ url_for('dang_nhap.logout') }}" class="logout-btn">Đăng xuất</a>
+        </div>
+    {% else %}
+        <!-- Form đăng nhập bằng số điện thoại -->
+        <form action="{{ url_for('dang_nhap.show_login_page') }}" method="POST" class="login-form">
+            {% if error %}
+                <p class="error">{{ error }}</p>
+            {% endif %}
+            <input type="text" name="phone" placeholder="Số điện thoại" required><br>
+            <input type="password" name="password" placeholder="Mật khẩu" required><br>
+            <button type="submit">Đăng nhập</button>
+        </form>
+
+        <!-- Liên kết phụ -->
+        <div class="extra-links">
+            <a href="{{ url_for('dang_nhap.dang_ky') }}">Tạo tài khoản</a><br>
+            <a href="/forgot-password">Quên mật khẩu?</a>
+        </div>
+
+        <!-- Đăng nhập bằng Google -->
+        <div class="google-login">
+            <a class="google-btn" href="{{ url_for('google.login') }}">
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">
+                Đăng nhập với Google
+            </a>
+        </div>
+    {% endif %}
+    
+    <a href="/" class="back-btn">Quay lại trang chủ</a>
+</div>
+</body>
+</html>

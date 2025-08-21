@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Nạp tiền</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='nap_tien.css') }}">
+</head>
+<body>
+  <h1>Chọn ngân hàng để nạp tiền</h1>
+<div class="bank-container">
+  <div class="bank-list">
+  <div class="bank-item" onclick="selectBank('Vietcombank')">
+    <img src="{{ url_for('static', filename='banks/vietcombank.jpg') }}" alt="Vietcombank" class="bank-logo">
+    <span>Vietcombank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('BIDV')">
+    <img src="{{ url_for('static', filename='banks/bidv.jpg') }}" alt="BIDV" class="bank-logo">
+    <span>BIDV</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('VietinBank')">
+    <img src="{{ url_for('static', filename='banks/vietinbank.jpg') }}" alt="VietinBank" class="bank-logo">
+    <span>VietinBank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('Agribank')">
+    <img src="{{ url_for('static', filename='banks/agribank.jpg') }}" alt="Agribank" class="bank-logo">
+    <span>Agribank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('Techcombank')">
+    <img src="{{ url_for('static', filename='banks/techcombank.jpg') }}" alt="Techcombank" class="bank-logo">
+    <span>Techcombank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('MB Bank')">
+    <img src="{{ url_for('static', filename='banks/mbbank.jpg') }}" alt="MB Bank" class="bank-logo">
+    <span>MB Bank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('ACB')">
+    <img src="{{ url_for('static', filename='banks/acb.jpg') }}" alt="ACB" class="bank-logo">
+    <span>ACB</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('TPBank')">
+    <img src="{{ url_for('static', filename='banks/tpbank.jpg') }}" alt="TPBank" class="bank-logo">
+    <span>TPBank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('VPBank')">
+    <img src="{{ url_for('static', filename='banks/vpbank.jpg') }}" alt="VPBank" class="bank-logo">
+    <span>VPBank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('Sacombank')">
+    <img src="{{ url_for('static', filename='banks/sacombank.jpg') }}" alt="Sacombank" class="bank-logo">
+    <span>Sacombank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('SHB')">
+    <img src="{{ url_for('static', filename='banks/shb.jpg') }}" alt="SHB" class="bank-logo">
+    <span>SHB</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('SeABank')">
+    <img src="{{ url_for('static', filename='banks/seabank.jpg') }}" alt="SeABank" class="bank-logo">
+    <span>SeABank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('HDBank')">
+    <img src="{{ url_for('static', filename='banks/hdbanl.jpg') }}" alt="HDBank" class="bank-logo">
+    <span>HDBank</span>
+  </div>
+  <div class="bank-item" onclick="selectBank('Nam A Bank')">
+    <img src="{{ url_for('static', filename='banks/namabank.jpg') }}" alt="Nam A Bank" class="bank-logo">
+    <span>Nam A Bank</span>
+  </div>
+  </div>
+  
+</div>
+  
+  <div id="payment-methods" style="display:none;">
+    
+    <h2>Chọn phương thức thanh toán:</h2>
+    <button onclick="showForm('stk')">STK</button>
+    <button onclick="showForm('qr')">Quét mã QR</button>
+    <button type="button" onclick="window.location.href='/'">Quay lại trang chủ</button>
+    <form id="stk-form" method="POST" style="display:none;">
+    <input type="hidden" name="method" value="stk">
+    <input type="hidden" id="selected-bank" name="bank">
+
+    <p><strong>Ngân hàng:</strong> <span id="display-bank"></span></p>
+    <p><strong>Tên tài khoản:</strong> <span id="display-name"></span></p>
+    <p><strong>Số tài khoản:</strong> <span id="display-stk"></span></p>
+
+    <p><strong>Nội dung chuyển khoản:</strong> <span id="transfer-content"></span></p>
+
+    <label for="amount"><strong>Số tiền cần nạp:</strong></label>
+    <input type="number" name="amount" required min="50000" placeholder="Nhập số tiền (tối thiểu 50,000 VND)">
+
+  <!-- Hidden inputs để gửi về server -->
+    <input type="hidden" name="name" id="hidden-name">
+    <input type="hidden" name="stk" id="hidden-stk">
+    <input type="hidden" name="content" id="hidden-content">
+  
+    <button type="submit">Xác nhận nạp tiền</button>
+    
+
+  </form>
+
+
+    <div id="qr-form" style="display:none;">
+      <p>Quét mã QR sau để thanh toán:</p>
+      <img id="qr-image" src="" alt="Mã QR">
+    </div>
+  </div>
+  <div id="message-box" style="margin-top: 10px; color: green; font-weight: bold;"></div>
+  
+  <script>
+    document.getElementById("stk-form").addEventListener("submit", function(e) {
+      e.preventDefault();  // ❌ Không load lại trang
+
+      const formData = new FormData(this);
+
+      fetch("/nap-tien", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("message-box").textContent = "✅ " + data.message;
+      })
+      .catch(err => {
+        document.getElementById("message-box").textContent = "❌ Có lỗi xảy ra khi gửi yêu cầu.";
+      });
+    });
+    
+    let selectedBank = "";
+
+    async function selectBank(bank) {
+      document.getElementById("message-box").textContent = "";
+      selectedBank = bank;
+      document.getElementById("selected-bank").value = bank;
+      document.getElementById("payment-methods").style.display = "block";
+    
+    // Cập nhật QR code nếu có
+      document.getElementById("qr-image").src = "/static/qrs/" + bank + "_qr.png";
+    
+    // Gửi yêu cầu đến server để lấy thông tin ngân hàng
+      const res = await fetch("/api/bank-info?bank=" + encodeURIComponent(bank));
+      const data = await res.json();
+
+    // Lưu vào các span và input ẩn
+      document.getElementById("display-bank").innerText = bank;
+      document.getElementById("display-name").innerText = data.account_name || "Chờ cập nhật";
+      document.getElementById("display-stk").innerText = data.account_number || "Chờ cập nhật";
+
+      const userName = "{{ session.get('user', {}).get('name', '') }}";
+      document.getElementById("transfer-content").innerText = userName + " chuyển khoản";
+
+    // Gán vào hidden để gửi về server
+      document.getElementById("hidden-name").value = data.account_name || "Chờ cập nhật";
+      document.getElementById("hidden-stk").value = data.account_number || "Chờ cập nhật";
+      document.getElementById("hidden-content").value = userName + " chuyển khoản";
+    } 
+
+    function showForm(method) {
+      document.getElementById("stk-form").style.display = method === 'stk' ? 'block' : 'none';
+      document.getElementById("qr-form").style.display = method === 'qr' ? 'block' : 'none';
+    }
+  </script>
+
+</body>
+</html>

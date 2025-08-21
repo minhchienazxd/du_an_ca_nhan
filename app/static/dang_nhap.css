@@ -1,0 +1,165 @@
+/* static/dang_nhap.css */
+
+/* Reset cơ bản */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+/* Toàn trang */
+body {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    /* Hình nền */
+    background: url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e") no-repeat center center/cover;
+}
+
+/* Container */
+.login-container {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 30px;
+    border-radius: 15px;
+    width: 350px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.8s ease-in-out;
+}
+
+/* Tiêu đề */
+.login-container h1 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+/* Form */
+.login-form input {
+    width: 90%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.login-form button {
+    width: 95%;
+    padding: 12px;
+    margin-top: 10px;
+    border: none;
+    background: #007BFF;
+    color: white;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.login-form button:hover {
+    background: #0056b3;
+}
+
+/* Google Login */
+.google-login {
+    margin-top: 15px;
+}
+
+.google-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    background: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    color: #333;
+    transition: 0.3s;
+}
+
+.google-btn img {
+    width: 20px;
+    height: 20px;
+}
+
+.google-btn:hover {
+    background: #f5f5f5;
+}
+
+/* Extra links */
+.extra-links {
+    margin-top: 10px;
+    font-size: 14px;
+}
+
+.extra-links a {
+    color: #007BFF;
+    text-decoration: none;
+}
+
+.extra-links a:hover {
+    text-decoration: underline;
+}
+
+/* Back button */
+.back-btn {
+    display: inline-block;
+    margin-top: 20px;
+    text-decoration: none;
+    color: white;
+    background: #28a745;
+    padding: 10px 15px;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+
+.back-btn:hover {
+    background: #1e7e34;
+}
+
+/* User info (nếu đã đăng nhập) */
+.user-info {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #007BFF;
+}
+
+.name-balance h2 {
+    margin: 5px 0;
+    color: #333;
+}
+
+.balance {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.logout-btn {
+    background: #dc3545;
+    padding: 10px 15px;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+
+.logout-btn:hover {
+    background: #b02a37;
+}
+
+/* Hiệu ứng fade in */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Yêu cầu rút tiền</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background: #f4f6f8;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .form-container {
+      background: white;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 24px;
+      font-size: 24px;
+    }
+
+    label {
+      margin-top: 16px;
+      display: block;
+      font-weight: 600;
+      color: #34495e;
+      margin-bottom: 6px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+      transition: border-color 0.2s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: #3498db;
+      outline: none;
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button[type="submit"] {
+      background-color: #3498db;
+      color: white;
+    }
+
+    button[type="submit"]:hover {
+      background-color: #2980b9;
+    }
+
+    button[type="button"] {
+      background-color: #95a5a6;
+      color: white;
+    }
+
+    button[type="button"]:hover {
+      background-color: #7f8c8d;
+    }
+
+    #message-box {
+      margin-top: 16px;
+      text-align: center;
+      font-weight: bold;
+      color: #27ae60;
+    }
+
+    @media (max-width: 500px) {
+      .form-container {
+        padding: 24px;
+        border-radius: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="form-container">
+    <h1>🏧 Yêu cầu rút tiền</h1>
+
+    <form id="form-rut">
+      <label for="bank">Ngân hàng:</label>
+      <select name="bank" id="bank" required>
+        {% for bank in banks %}
+          <option value="{{ bank.bank_name }}">{{ bank.bank_name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="stk">Số tài khoản:</label>
+      <input type="text" name="stk" id="stk" required>
+
+      <label for="name">Tên chủ tài khoản:</label>
+      <input type="text" name="name" id="name" required>
+
+      <label for="amount">Số tiền muốn rút:</label>
+      <input type="number" name="amount" id="amount" min="1000" required>
+
+      <button type="submit">Gửi yêu cầu</button>
+      <button type="button" onclick="window.location.href='/'">Quay lại trang chủ</button>
+    </form>
+
+    <div id="message-box"></div>
+  </div>
+
+  <script>
+    document.getElementById("form-rut").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+
+      fetch("/rut-tien", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("message-box").textContent = "✅ " + data.message;
+        document.getElementById("form-rut").reset();
+      })
+      .catch(() => {
+        document.getElementById("message-box").textContent = "❌ Lỗi khi gửi yêu cầu rút tiền.";
+      });
+    });
+  </script>
+
+</body>
+</html>

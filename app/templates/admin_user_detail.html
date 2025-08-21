@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Chi tiết người dùng</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    .info-box {
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+      margin-bottom: 20px;
+    }
+    .info-box p {
+      margin: 6px 0;
+    }
+    .tabs {
+      margin-bottom: 20px;
+    }
+    .tab-button {
+      padding: 10px 20px;
+      border: none;
+      background-color: #eee;
+      margin-right: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .tab-button.active {
+      background-color: #007bff;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .pending { color: orange; }
+    .approved { color: green; }
+    .rejected { color: red; }
+    .back-btn {
+      margin-top: 10px;
+      display: inline-block;
+      text-decoration: none;
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>👤 Thông tin người dùng</h1>
+  <div class="info-box">
+    <p><strong>Tên:</strong> {{ user.name }}</p>
+    <p><strong>Email:</strong> {{ user.email or "Chưa có" }}</p>
+    <p><strong>SĐT:</strong> {{ user.phone or "Chưa có" }}</p>
+    <p><strong>Phương thức đăng nhập:</strong> {{ user.method }}</p>
+    <p><strong>Số dư:</strong> {{ "{:,.0f}".format((user.balance )) }} VNĐ</p>
+    <a href="/admin/users" class="back-btn">← Quay về danh sách người dùng</a>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-button active" onclick="showTab('nap')">💰 Nạp tiền</button>
+    <button class="tab-button" onclick="showTab('rut')">📤 Rút tiền</button>
+    <button class="tab-button" onclick="showTab('ghi')">📜 Ghi lô</button>
+  </div>
+
+  <div class="tab-content active" id="tab-nap">
+    {% if nap_tiens %}
+      <table>
+        <thead>
+          <tr>
+            <th>Ngân hàng</th><th>Tên</th><th>Số TK</th><th>Số tiền</th><th>Nội dung</th><th>Thời gian</th><th>Trạng thái</th><th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for nap in nap_tiens %}
+          <tr>
+            <td>{{ nap.bank }}</td>
+            <td>{{ nap.name }}</td>
+            <td>{{ nap.stk }}</td>
+            <td>{{ nap.amount }}</td>
+            <td>{{ nap.content }}</td>
+            <td>{{ nap.time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="{{ nap.status }}">{{ nap.status }}</td>
+            <td>
+              {% if nap.status == 'pending' and is_admin %}
+              <form action="{{ url_for('admin.xac_nhan_nap', nap_id=nap._id) }}" method="post" style="display:inline;">
+                <button type="submit">✅ Duyệt</button>
+              </form>
+              <form action="{{ url_for('admin.tu_choi_nap', nap_id=nap._id) }}" method="post" style="display:inline;">
+                <button type="submit">❌ Từ chối</button>
+              </form>
+              {% else %}<em>Đã xử lý</em>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Không có lịch sử nạp tiền.</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-content" id="tab-rut">
+    {% if rut_tiens %}
+      <table>
+        <thead>
+          <tr><th>Ngân hàng</th><th>Số tài khoản</th><th>Tên</th><th>Số tiền</th><th>Thời gian</th><th>Trạng thái</th><th>Hành động</th></tr>
+        </thead>
+        <tbody>
+          {% for rut in rut_tiens %}
+          <tr>
+            <td>{{ rut.bank }}</td>
+            <td>{{ rut.stk }}</td>
+            <td>{{ rut.name }}</td>
+            <td>{{ rut.amount }}</td>
+            <td>{{ rut.time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ rut.status }}</td>
+            <td>
+              {% if rut.status == 'pending' and is_admin %}
+              <form method="POST" action="{{ url_for('admin.xac_nhan_rut', rut_id=rut._id) }}">
+                <button type="submit">✅ Xác nhận</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.tu_choi_rut', rut_id=rut._id) }}">
+                <button type="submit">❌ Từ chối</button>
+              </form>
+              {% else %}Đã xử lý{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Không có lịch sử rút tiền.</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-content" id="tab-ghi">
+    {% if ghi_los %}
+      <table>
+        <thead>
+          <tr>
+            <th>Số</th><th>Điểm</th><th>Loại</th><th>Trừ tiền</th><th>Thời gian</th><th>Trạng thái</th><th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ghi in ghi_los %}
+          <tr>
+            
+            <td>{{ ghi.number }}</td>
+            <td>{{ "{:,}".format(ghi.diem) }}</td>
+            <td>{{ ghi.loai }}</td>
+            <td>{{ "{:,}".format(ghi.tru_tien) }} đ</td>
+            <td>{{ ghi.time.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>
+              {% if ghi.status == "pending" %}
+                <span style="color: orange;">⏳ Chờ xử lý</span>
+              {% else %}
+                ✅ {{ ghi.ket_qua|capitalize }} ({{ "{:,}".format(ghi.so_tien_thang) }} đ)
+              {% endif %}
+            </td>
+            <td>
+              {% if ghi.status == "pending" and is_admin %}
+              <form method="POST" action="{{ url_for('admin.xu_ly_ghi_lo', ghi_lo_id=ghi._id) }}">
+                <input type="hidden" name="ket_qua" value="win">
+                <button type="submit">✅ Win</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.xu_ly_ghi_lo', ghi_lo_id=ghi._id) }}">
+                <input type="hidden" name="ket_qua" value="lose">
+                <button type="submit">❌ Lose</button>
+              </form>
+              {% else %}
+              Đã xử lý
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Không có lịch sử ghi lô.</p>
+    {% endif %}
+  </div>
+
+  <script>
+    function showTab(name) {
+      const buttons = document.querySelectorAll('.tab-button');
+      const contents = document.querySelectorAll('.tab-content');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      contents.forEach(tab => tab.classList.remove('active'));
+
+      document.querySelector('#tab-' + name).classList.add('active');
+      event.target.classList.add('active');
+    }
+  </script>
+
+</body>
+</html>

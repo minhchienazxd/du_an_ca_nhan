@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Danh sách người dùng</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background: #f8f9fa;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+      background: #fff;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 24px;
+      font-size: 24px;
+      text-align: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f3f5;
+      color: #555;
+      font-weight: 600;
+      border-bottom: 2px solid #dee2e6;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9fafb;
+    }
+
+    tr:hover {
+      background-color: #eef2f5;
+    }
+
+    .alert {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 4px 8px;
+      background-color: #fff3cd;
+      color: #856404;
+      font-size: 0.85em;
+      border-radius: 6px;
+    }
+
+    .view-link {
+      text-decoration: none;
+      color: #3498db;
+      font-weight: 500;
+    }
+
+    .view-link:hover {
+      text-decoration: underline;
+    }
+
+    .back-btn {
+      margin-top: 28px;
+      display: inline-block;
+      text-decoration: none;
+      background-color: #6c757d;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: background 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background-color: #5a6268;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+      }
+
+      th, td {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>📋 Danh sách người dùng</h1>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tên</th>
+          <th>Email</th>
+          <th>Chi tiết</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in user_status_list %}
+        <tr>
+          <td>{{ item.user.name }}</td>
+          <td>{{ item.user.email or "Chưa có" }}</td>
+          <td>
+            <a class="view-link" href="{{ url_for('admin.user_detail', user_id=item.user._id) }}">Xem</a>
+            {% if item.total_pending > 0 %}
+              <span class="alert">🔔 {{ item.total_pending }} yêu cầu chờ xử lý</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <a href="/" class="back-btn">⬅ Quay lại trang chủ</a>
+  </div>
+
+</body>
+</html>

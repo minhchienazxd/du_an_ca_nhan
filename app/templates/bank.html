@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Quản lý ngân hàng</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f9f9f9;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    form {
+      margin-bottom: 30px;
+      padding: 15px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      max-width: 500px;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+      max-width: 600px;
+    }
+
+    li {
+      background-color: #fff;
+      margin-bottom: 10px;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    a {
+      color: #d9534f;
+      text-decoration: none;
+      margin-left: 10px;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .back-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 8px 16px;
+      background-color: #28a745;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+    }
+
+    .back-btn:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏦 Quản lý tài khoản ngân hàng</h1>
+
+  <form method="POST" action="{{ url_for('admin.add_bank') }}">
+    <input name="bank_name" placeholder="Tên ngân hàng" required>
+    <input name="account_number" placeholder="Số tài khoản" required>
+    <input name="account_name" placeholder="Tên tài khoản" required>
+    <button type="submit">➕ Thêm</button>
+  </form>
+
+  <ul>
+    {% for bank in banks %}
+    <li>
+      {{ bank.bank_name }} - {{ bank.account_number }} - {{ bank.account_name }}
+      <a href="{{ url_for('admin.delete_bank', bank_id=bank._id) }}">🗑️ Xoá</a>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <a href="/" class="back-btn">⬅️ Quay lại trang chủ</a>
+</body>
+</html>

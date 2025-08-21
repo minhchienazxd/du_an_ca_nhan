@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>KQ XSMB</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .so-container-6 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    /* Thêm CSS comment */
+    .comments-container { margin-top: 5px; padding-left: 10px; }
+    .comment { margin-bottom: 3px; font-size: 0.9em; }
+    .post input[type=text] { width: 100%; padding: 4px; margin-top: 5px; }
+    .actions button { cursor: pointer; }
+
+    /* Highlight post khi từ thông báo */
+    .highlight-post { background-color: #fffae6; transition: background 3s; }
+
+    /* Notification */
+    .notifications { display: none; margin-top: 10px; }
+    .notification { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
+    .notification:hover { background-color: #f0f0f0; }
+    .notification.unseen { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <!-- Menu mobile -->
+  <div class="menu-wrapper">
+    <button class="hamburger-btn">☰</button>
+    <div id="menu-items" class="menu-hidden">
+      {% if user %}
+        <a href="/nap-tien"><i class="fas fa-wallet"></i> Nạp tiền</a>
+        <a href="/rut-tien"><i class="fas fa-money-bill-wave"></i> Rút tiền</a>
+        <a href="/ghi-lo"><i class="fas fa-pen"></i> Ghi lô</a>
+        <a href="/lich-su"><i class="fas fa-history"></i> Lịch sử</a>
+        <a href="/thong-ke" class="mobile-only"><i class="fas fa-chart-bar"></i> Thống kê</a>
+        <a href="/phan-tich" class="mobile-only"><i class="fas fa-brain"></i> Phân tích</a>
+        <a href="/du-doan"><i class="fas fa-eye"></i> Dự đoán</a>
+        {% if user.role == 'admin' %}
+        <a href="/admin/bank"><i class="fas fa-bank"></i> Quản lý ngân hàng</a>
+        <a href="/admin/users"><i class="fas fa-users-cog"></i> Quản lý người dùng</a>
+        {% endif %}
+        <div class="user-info">
+          <div class="user-row">
+            <img src="{{ user.picture }}" class="avatar" alt="Avatar">
+            <div class="user-name">{{ user.name }}</div>
+          </div>
+          <div class="user-balance">Số dư: {{ "{:,.0f}".format((user.balance | default(0))) }}VND</div>
+          <a href="{{ url_for('dang_nhap.logout') }}" class="logout-btn">Đăng xuất</a>
+        </div>
+      {% else %}
+        <a href="/dang-nhap"><i class="fas fa-sign-in-alt"></i> Đăng nhập</a>
+      {% endif %}
+    </div>
+  </div>
+  <script>
+    document.querySelector(".hamburger-btn").addEventListener("click", function () {
+      document.getElementById("menu-items").classList.toggle("menu-hidden");
+    });
+  </script>
+
+  <div class="layout">
+    <!-- Sidebar trái -->
+    <div class="desktop-sidebar sticky-sidebar">
+      <div class="sidebar-box">
+        <div class="sidebar-section tk-box">
+          <div class="section-title"><a href="/thong-ke" class="tk-link">📊 Thống kê</a></div>
+        </div>
+        <div class="sidebar-section pt-box">
+          <div class="section-title"><a href="/phan-tich" class="pt-link">🧠 Phân tích</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nội dung chính -->
+    <main>
+      <div class="tuan">
+        {% for day in week_days %}
+          <a href="/ket-qua{{ day.date_str }}" class="ngay-link {% if not day.available %}cho{% endif %}">
+            {{ day.label }}
+          </a>
+        {% endfor %}
+      </div>
+
+      {% if result.is_waiting %}
+        <p class="section-title" style="color: orange; font-weight: bold;">⏳ Chưa có kết quả - Chờ quay thưởng</p>
+      {% endif %}
+      <h1 class="section-title" style="color: red; padding-right: 40px">
+        Xổ số Miền Bắc {{ result.date }}
+      </h1>
+
+      <div class="wrapper">
+        <div class="bang-container">
+          <table class="bang-kq">
+            <tr><th>Giải</th><th>Kết quả</th></tr>
+            {% for giai, ds in result.ketqua.items() %}
+            <tr class="{% if giai == 'ĐB' %}giai-db{% elif giai == 'G7' %}giai-g7{% endif %}">
+              <td class="giai">{{ giai }}</td>
+              <td>
+                <div class="so-container {% if ds|length == 6 %}so-container-6{% endif %}">
+                  {% for so in ds %}
+                    <div class="so {% if giai in ['ĐB', 'G7'] %}do{% endif %}">{{ so }}</div>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+        <div class="bang-thongke">
+          <table class="bang-kq-thongke">
+            <thead><tr><th>Đầu</th><th>Đuôi</th></tr></thead>
+            <tbody>
+              {% for dau, duois in thong_ke.items() %}
+              <tr>
+                <td class="giai">{{ dau }}</td>
+                <td>
+                  <div class="so-container-nho">
+                    {% for duoi in duois %}
+                      <div class="so-nho">{{ duoi }}</div>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% for item in past_results %}
+      <h2 class="section-title" style="color: black; margin: 30px auto 20px auto;">Kết quả ngày {{ item.date }}</h2>
+      <div class="wrapper">
+        <div class="bang-container">
+          <table class="bang-kq">
+            <tr><th>Giải</th><th>Kết quả</th></tr>
+            {% for giai, ds in item.ketqua.items() %}
+            <tr class="{% if giai == 'ĐB' %}giai-db{% elif giai == 'G7' %}giai-g7{% endif %}">
+              <td class="giai">{{ giai }}</td>
+              <td>
+                <div class="so-container {% if ds|length == 6 %}so-container-6{% endif %}">
+                  {% for so in ds %}
+                    <div class="so {% if giai in ['ĐB', 'G7'] %}do{% endif %}">{{ so }}</div>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+        <div class="bang-thongke">
+          <table class="bang-kq-thongke">
+            <thead><tr><th>Đầu</th><th>Đuôi</th></tr></thead>
+            <tbody>
+              {% for dau, duois in item.thong_ke.items() %}
+              <tr>
+                <td class="giai">{{ dau }}</td>
+                <td>
+                  <div class="so-container-nho">
+                    {% for duoi in duois %}
+                      <div class="so-nho">{{ duoi }}</div>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    </main>
+
+    <!-- Sidebar phải -->
+    {% if user %}
+    <aside class="right-sidebar">
+      <div class="top-bar">
+        <div class="menu-item" onclick="showFeed()">
+          <i class="fas fa-home fa-lg"></i>
+        </div>
+        <div class="menu-item" onclick="showFriends()">
+          <i class="fas fa-user-friends fa-lg"></i>
+        </div>
+        <div class="menu-item" onclick="showNotifications()">
+          <i class="fas fa-bell fa-lg"></i>
+          {% if unseen_count and unseen_count > 0 %}
+            <span class="badge">{{ unseen_count }}</span>
+          {% endif %}
+        </div>
+        <div class="menu-item" onclick="alert('Đang phát triển')">
+          <i class="fas fa-envelope fa-lg"></i>
+        </div>
+      </div>
+
+      <!-- FEED -->
+      <div class="feed-table" id="feed-table" style="display:block;">
+        <div class="post-form">
+          <textarea id="post-content" placeholder="Bạn đang nghĩ gì...?"></textarea>
+          <button id="btn-post">Đăng bài</button>
+        </div>
+
+        <div id="posts-container">
+          {% if posts|length == 0 %}
+            <p style="text-align:center; color: gray;">Chưa có bài viết nào. Hãy đăng bài đầu tiên!</p>
+          {% else %}
+            {% for post in posts %}
+              <div class="post" data-id="{{ post._id }}">
+                <img src="{{ post.user_picture }}" class="avatar">
+                <b>{{ post.user_name }}</b>
+                <div>{{ post.content }}</div>
+                <small>{{ post.time }}</small>
+                <div class="actions">
+                  <button onclick="likePost('{{ post._id }}', this)"
+                          class="{% if user._id|string in post.liked_by %}liked{% endif %}">
+                    Like ({{ post.likes | default(0) }})
+                  </button>
+                </div>
+                <div class="comments-container">
+                  {% for c in post.comments %}
+                    <div class="comment"><b>{{ c.user_name }}</b>: {{ c.content }} <small>{{ c.time }}</small></div>
+                  {% endfor %}
+                </div>
+                <input type="text" placeholder="Viết bình luận..."
+                       onkeydown="if(event.key==='Enter') commentPost('{{ post._id }}', this)">
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="friends-table" id="friends-container" style="display:none; padding: 10px;">
+        <h3>Danh sách bạn bè</h3>
+        <input type="text" id="friend-search-input" placeholder="Tìm kiếm bạn bè..." style="width:100%; padding:4px; margin-bottom:5px;">
+        <button id="friend-search-btn">Tìm kiếm</button>
+
+        <div id="friend-search-results" style="margin-top:5px;"></div>
+        <h4>Lời mời kết bạn</h4>
+        <div id="friend-requests"></div>
+        <h4>Danh sách bạn bè</h4>
+        <div id="friend-list"></div>
+      </div>
+
+      <!-- NOTIFICATIONS (luôn là lịch sử: cả seen & unseen) -->
+      <div class="notifications" id="notifications-container">
+        {% if notifications|length == 0 %}
+          <div class="notification">Chưa có thông báo nào</div>
+        {% else %}
+          {% for n in notifications %}
+            <div class="notification {% if n.seen %}seen{% else %}unseen{% endif %}"
+                 data-id="{{ n._id }}"
+                 data-post="{{ n.post_id }}"
+                 data-type="{{ n.type }}"
+                 onclick="openNotification(this)">
+              <span class="notification-type">{{ n.type|capitalize }}</span>
+              từ <b>{{ n.from_user }}</b>
+              <br><small>{{ n.time }}</small>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </aside>
+    {% endif %}
+  </div>
+
+<script>
+// ===== QUẢN LÝ TAB =====
+function showFeed(){
+  document.getElementById('feed-table').style.display = 'block';
+  document.getElementById('notifications-container').style.display = 'none';
+  document.getElementById('friends-container').style.display = 'none';
+
+  const posts = document.querySelectorAll('#posts-container .post');
+  posts.forEach(p => {
+    p.style.display = "block";
+    p.classList.remove("highlight-post");
+  });
+}
+
+function showFriends(){
+  document.getElementById('feed-table').style.display = 'none';
+  document.getElementById('notifications-container').style.display = 'none';
+  document.getElementById('friends-container').style.display = 'block';
+  loadFriendRequests();
+  loadFriendList();
+}
+
+function showNotifications(){
+  document.getElementById('feed-table').style.display = 'none';
+  document.getElementById('friends-container').style.display = 'none';
+  document.getElementById('notifications-container').style.display = 'block';
+}
+
+// Click 1 notification: set seen + hành vi theo type
+function openNotification(elem){
+  const notificationId = elem.dataset.id;
+  const postId = elem.dataset.post || '';
+  const type = (elem.dataset.type || '').toLowerCase();
+
+  fetch(`/notifications/seen/${notificationId}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(() => {
+      if (elem.classList.contains("unseen")) {
+        elem.classList.remove('unseen');
+        elem.classList.add('seen');
+
+        let badge = document.querySelector('.menu-item .badge');
+        if (badge) {
+          let current = parseInt(badge.innerText);
+          if (current > 1) badge.innerText = current - 1;
+          else badge.remove();
+        }
+      }
+    }).catch(()=>{});
+
+  if (type === 'like' || type === 'comment') {
+    showFeed();
+    const feed = document.querySelector('#posts-container');
+    if (feed && postId){
+      const posts = feed.querySelectorAll('.post');
+      posts.forEach(p => {
+        if (p.dataset.id === postId){
+          p.style.display = "block";
+          p.classList.add("highlight-post");
+          p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          p.style.display = "none";
+        }
+      });
+    }
+  } else if (type === 'friend_request' || type === 'friend_request_accepted') {
+    showFriends();
+  } else {
+    showFeed();
+  }
+}
+
+// ===== FRIENDS =====
+document.getElementById('friend-search-btn').addEventListener('click', function(){
+  const q = document.getElementById('friend-search-input').value.trim();
+  if (!q) return;
+  fetch(`/friends/search?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(d => {
+      const resultsDiv = document.getElementById('friend-search-results');
+      resultsDiv.innerHTML = '';
+      if (!d.users || d.users.length === 0){
+        resultsDiv.innerHTML = '<p>Không tìm thấy người dùng</p>';
+        return;
+      }
+      d.users.forEach(u => {
+        const div = document.createElement('div');
+        div.innerHTML = `<b>${u.name || u.username || 'Người dùng'}</b> <button onclick="sendFriendRequest('${u._id}', this)">Kết bạn</button>`;
+        resultsDiv.appendChild(div);
+      });
+    });
+});
+
+function sendFriendRequest(userId, btn){
+  fetch(`/friends/send_request/${userId}`, { method:'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok){
+        btn.textContent = 'Đã gửi';
+        btn.disabled = true;
+      } else {
+        alert(d.error || 'Lỗi');
+      }
+    });
+}
+
+function loadFriendRequests(){
+  fetch('/friends/requests')
+    .then(r => r.json())
+    .then(d => {
+      const div = document.getElementById('friend-requests');
+      div.innerHTML = '';
+      if (!d.requests || d.requests.length === 0){
+        div.innerHTML = '<p>Chưa có lời mời nào</p>';
+        return;
+      }
+      d.requests.forEach(req => {
+        const el = document.createElement('div');
+        // Backend hiện trả: { _id, from_user, to_user, time } -> dùng from_user (id) hiển thị
+        el.innerHTML = `
+          <div class="friend-request">
+            <img src="${req.from_user_picture || '/static/default-avatar.png'}" class="avatar" style="width:30px; height:30px; border-radius:50%;">
+            <b>${req.from_user_name || 'Người dùng'}</b>
+            <button onclick="respondFriendRequest('${req._id}','accept', this)">Chấp nhận</button>
+            <button onclick="respondFriendRequest('${req._id}','reject', this)">Từ chối</button>
+          </div>
+        `;
+        div.appendChild(el);
+      });
+    });
+}
+
+function respondFriendRequest(requestId, action, btn){
+  fetch(`/friends/respond_request/${requestId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action })
+  }).then(r => r.json())
+    .then(d => {
+      if (d.ok){
+        btn.parentElement.remove();
+        loadFriendList();
+      } else {
+        alert(d.error || 'Lỗi');
+      }
+    });
+}
+
+function loadFriendList(){
+  fetch('/friends/list')
+    .then(r => r.json())
+    .then(d => {
+      const div = document.getElementById('friend-list');
+      div.innerHTML = '';
+      if (!d.friends || d.friends.length === 0){
+        div.innerHTML = '<p>Chưa có bạn bè nào</p>';
+        return;
+      }
+      d.friends.forEach(f => {
+        const el = document.createElement('div');
+        el.textContent = f.name || f.username || f._id;
+        div.appendChild(el);
+        
+      });
+    });
+}
+
+// ===== POST / LIKE / COMMENT =====
+const btnPost = document.getElementById('btn-post');
+if (btnPost){
+  btnPost.addEventListener('click', function(){
+    const contentEl = document.getElementById('post-content');
+    const content = (contentEl.value || '').trim();
+    if (!content) return alert('Nội dung bài viết không được để trống!');
+
+    fetch('/feed/post', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ content })
+    }).then(r => r.json())
+      .then(() => { location.reload(); })
+      .catch(() => alert('Lỗi đăng bài'));
+  });
+}
+
+function likePost(postId, btn){
+  fetch(`/feed/like/${postId}`, { method:'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (typeof d.likes !== 'undefined') {
+        btn.textContent = `Like (${d.likes})`;
+        if ('liked' in d) btn.classList.toggle('liked', d.liked);
+      } else if (d.error) {
+        alert(d.error);
+      }
+    }).catch(()=>{});
+}
+
+function commentPost(postId, input){
+  const content = (input.value||'').trim();
+  if(!content) return;
+  fetch(`/feed/comment/${postId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ content })
+  }).then(r=>r.json())
+    .then(d=>{
+      if(!d.error) location.reload();
+      else alert(d.error||'Lỗi');
+    }).catch(()=>alert('Lỗi bình luận'));
+}
+const typeMessages = {
+    "Friend_request": "đã gửi cho bạn lời mời kết bạn",
+    "Friend_request_accepted": "đã chấp nhận lời mời kết bạn của bạn",
+    "Comment": "đã bình luận về bài viết của bạn",
+    "Like": "đã thích bài viết của bạn"
+  };
+
+  function renderNotifications(notifications) {
+    const box = document.getElementById("notifications");
+    box.innerHTML = "";
+
+    notifications.forEach(noti => {
+      const msg = typeMessages[noti.type] || noti.type;
+      box.innerHTML += `
+        <div class="noti-item">
+          <b>${noti.from_user_name}</b> ${msg} <br>
+          <small>${noti.time}</small>
+        </div>
+      `;
+    });
+  }
+</script>
+
+</body>
+</html>

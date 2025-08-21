@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Ghi Lô</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      background: #fff;
+      margin: 40px auto;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 25px;
+      padding: 12px;
+      font-size: 16px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .balance {
+      font-size: 18px;
+      font-weight: bold;
+      color: green;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .flash-success {
+      color: green;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .flash-error {
+      color: red;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      text-decoration: none;
+      color: #555;
+    }
+
+    .back-link:hover {
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Ghi Lô</h1>
+
+    <p class="balance">Số dư hiện tại: {{ "{:,.0f}".format(balance|default(0, true) | int //1000) }} đ</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <p class="flash-{{ category }}">{{ message }}</p>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <label>Chọn loại:</label>
+      <select name="loai" required>
+        <option value="loto">Lô tô (1 điểm = 24.000đ)</option>
+        <option value="db">Đặc biệt (1 điểm = 1.000đ)</option>
+      </select>
+
+      <label>Số 2 chữ số:</label>
+      <input type="text" name="number" maxlength="2" required>
+
+      <label>Số điểm:</label>
+      <input type="number" name="diem" min="1" required>
+
+      <button type="submit">Ghi lô</button>
+    </form>
+
+    <a class="back-link" href="/">← Quay lại trang chủ</a>
+  </div>
+</body>
+</html>

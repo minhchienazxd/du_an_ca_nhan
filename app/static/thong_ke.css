@@ -1,0 +1,116 @@
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 2.5vw;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+form {
+  margin-bottom: 20px;
+}
+
+label {
+  margin: 0 5px;
+}
+
+input[type="date"], button {
+  padding: 5px;
+  margin: 0 5px;
+}
+
+.back-btn {
+  padding: 6px 12px;
+  margin-left: 10px;
+  text-decoration: none;
+  background-color: #ccc;
+  color: black;
+  border-radius: 4px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #ccc;
+}
+
+table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: max-content;
+  margin: auto;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  width: 30px;
+  height: 30px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 11px;
+  padding: 0;
+}
+
+th.ngay, td.ngay {
+  width: 90px;
+  font-weight: bold;
+  background-color: #f0f0f0;
+}
+
+/* Ô trắng: không về */
+.nhay-0 {
+  background-color: white;
+}
+
+/* Ô xanh nhạt: 1 nháy */
+.nhay-1 {
+  background-color: #81d4fa;
+}
+
+/* Ô xanh đậm: từ 2 nháy trở lên */
+.nhay-2 {
+  background-color: #0277bd;
+  color: white;
+  font-weight: bold;
+}
+
+/* Ô đỏ: về giải đặc biệt */
+.db {
+  background-color: red;
+}
+.bang-thongke {
+  max-width: 600px;
+  margin: 0 auto;
+  margin-top: 10px;
+}
+
+.bang-kq-thongke {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+
+.bang-kq-thongke th,
+.bang-kq-thongke td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.so-container-nho {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.so-nho {
+  background-color: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.2;
+}
