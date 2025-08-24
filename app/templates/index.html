@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     .so-container-6 {
       display: grid;
@@ -196,8 +197,10 @@
             <span class="badge">{{ unseen_count }}</span>
           {% endif %}
         </div>
-        <div class="menu-item" onclick="alert('Đang phát triển')">
-          <i class="fas fa-envelope fa-lg"></i>
+        <div class="menu-item" onclick="showMessages()">
+          <i class="fas fa-envelope fa-lg" style="position:relative;">
+            <span id="message-badge" style="position:absolute; top:-5px; right:-5px; display:none; background:red; color:white; border-radius:50%; padding:2px 6px; font-size:12px;"></span>
+          </i>
         </div>
       </div>
 
@@ -220,7 +223,7 @@
                 <small>{{ post.time }}</small>
                 <div class="actions">
                   <button onclick="likePost('{{ post._id }}', this)"
-                          class="{% if user._id|string in post.liked_by %}liked{% endif %}">
+                          class="{% if post.liked_by_current_user %}liked{% endif %}">
                     Like ({{ post.likes | default(0) }})
                   </button>
                 </div>
@@ -267,6 +270,11 @@
           {% endfor %}
         {% endif %}
       </div>
+
+      <div class="messages-container" id="messages-container" style="display:none; padding:10px;">
+        <h3>Tin nhắn</h3>
+        <div id="conversations"></div>
+      </div>
     </aside>
     {% endif %}
   </div>
@@ -277,6 +285,7 @@ function showFeed(){
   document.getElementById('feed-table').style.display = 'block';
   document.getElementById('notifications-container').style.display = 'none';
   document.getElementById('friends-container').style.display = 'none';
+  document.getElementById('messages-container').style.display = 'none';
 
   const posts = document.querySelectorAll('#posts-container .post');
   posts.forEach(p => {
@@ -289,220 +298,395 @@ function showFriends(){
   document.getElementById('feed-table').style.display = 'none';
   document.getElementById('notifications-container').style.display = 'none';
   document.getElementById('friends-container').style.display = 'block';
-  loadFriendRequests();
-  loadFriendList();
+  document.getElementById('messages-container').style.display = 'none';
+  loadFriends(); // <-- thêm dòng này
 }
 
 function showNotifications(){
   document.getElementById('feed-table').style.display = 'none';
   document.getElementById('friends-container').style.display = 'none';
   document.getElementById('notifications-container').style.display = 'block';
+  document.getElementById('messages-container').style.display = 'none';
 }
 
-// Click 1 notification: set seen + hành vi theo type
-function openNotification(elem){
-  const notificationId = elem.dataset.id;
-  const postId = elem.dataset.post || '';
-  const type = (elem.dataset.type || '').toLowerCase();
+function showMessages(){
+  document.getElementById('feed-table').style.display = 'none';
+  document.getElementById('friends-container').style.display = 'none';
+  document.getElementById('notifications-container').style.display = 'none';
+  document.getElementById('messages-container').style.display = 'block';
 
-  fetch(`/notifications/seen/${notificationId}`, { method: 'POST' })
-    .then(r => r.json())
-    .then(() => {
-      if (elem.classList.contains("unseen")) {
-        elem.classList.remove('unseen');
-        elem.classList.add('seen');
+}
 
-        let badge = document.querySelector('.menu-item .badge');
-        if (badge) {
-          let current = parseInt(badge.innerText);
-          if (current > 1) badge.innerText = current - 1;
-          else badge.remove();
-        }
-      }
-    }).catch(()=>{});
+const socket = io();
+const currentUserId = "{{ user._id|string }}";   // server render  // server render
+socket.on("connect", () => console.log("Socket connected!"));
+socket.on("connect_error", err => console.log("Socket connection error:", err));
+let currentChatPeer = null;
+let typingTimeout = null;
+let seenMsgIds = new Set();
+let unreadCount = 0;
 
-  if (type === 'like' || type === 'comment') {
-    showFeed();
-    const feed = document.querySelector('#posts-container');
-    if (feed && postId){
-      const posts = feed.querySelectorAll('.post');
-      posts.forEach(p => {
-        if (p.dataset.id === postId){
-          p.style.display = "block";
-          p.classList.add("highlight-post");
-          p.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-          p.style.display = "none";
-        }
-      });
-    }
-  } else if (type === 'friend_request' || type === 'friend_request_accepted') {
-    showFriends();
+// =====================
+// CẬP NHẬT BADGE TRÊN SIDEBAR
+// =====================
+function updateMessageBadge() {
+  const badge = document.getElementById("message-badge");
+  if (!badge) return;
+  if (unreadCount > 0) {
+    badge.style.display = "inline";
+    badge.textContent = unreadCount;
   } else {
-    showFeed();
+    badge.style.display = "none";
   }
 }
-
-// ===== FRIENDS =====
-document.getElementById('friend-search-btn').addEventListener('click', function(){
-  const q = document.getElementById('friend-search-input').value.trim();
-  if (!q) return;
-  fetch(`/friends/search?q=${encodeURIComponent(q)}`)
-    .then(r => r.json())
-    .then(d => {
-      const resultsDiv = document.getElementById('friend-search-results');
-      resultsDiv.innerHTML = '';
-      if (!d.users || d.users.length === 0){
-        resultsDiv.innerHTML = '<p>Không tìm thấy người dùng</p>';
-        return;
+// =====================
+  // Post mới từ server
+  // =====================
+socket.on("new_post", post => {
+    const container = document.getElementById("posts-container");
+    if(!container) return;
+    const div = document.createElement("div");
+    div.className = "post highlight-post";
+    div.dataset.id = post._id;
+    div.innerHTML = `
+      <img src="${post.user_picture}" class="avatar">
+      <b>${post.user_name}</b>
+      <div>${post.content}</div>
+      <small>${post.time}</small>
+      <div class="actions">
+        <button onclick="likePostSocket('${post._id}', this)">Like (0)</button>
+      </div>
+      <div class="comments-container"></div>
+      <input type="text" placeholder="Viết bình luận..." onkeydown="if(event.key==='Enter') commentPostSocket('${post._id}', this)">
+    `;
+    container.prepend(div);
+    setTimeout(()=> div.classList.remove("highlight-post"), 3000);
+  });
+  // =====================
+  // Like post
+  // =====================
+  function likePost(postId, btn){
+    socket.emit("like_post", { post_id: postId, user_id: currentUserId });
+  }
+  socket.on("update_like", data => {
+      const btn = document.querySelector(`.post[data-id="${data.post_id}"] button`);
+      if(btn) {
+          btn.innerText = `Like (${data.likes})`;
+          if(data.liked) btn.classList.add("liked");
+          else btn.classList.remove("liked");
       }
-      d.users.forEach(u => {
-        const div = document.createElement('div');
-        div.innerHTML = `<b>${u.name || u.username || 'Người dùng'}</b> <button onclick="sendFriendRequest('${u._id}', this)">Kết bạn</button>`;
-        resultsDiv.appendChild(div);
-      });
+  });
+
+  // =====================
+  // Comment post
+  // =====================
+  function commentPost(postId, input) {
+    if(!currentUserId) return alert("Bạn cần đăng nhập để bình luận.");
+    const content = input.value.trim();
+    if(!content) return;
+    socket.emit("comment_post", {
+        user_id: currentUserId,
+        user_name: "{{ user.name|string if user else '' }}",
+        user_picture: "{{ user.picture|string if user else '' }}",
+        post_id: postId,
+        content: content
     });
+    input.value = "";
+  }
+
+  socket.on("new_comment", data => {
+      const postEl = document.querySelector(`.post[data-id="${data.post_id}"] .comments-container`);
+      if(postEl) {
+          const c = data.comment;
+          const div = document.createElement("div");
+          div.className = "comment";
+          div.innerHTML = `<b>${c.user_name}</b>: ${c.content} <small>${c.time}</small>`;
+          postEl.appendChild(div);
+      }
+  });
+
+
+  // =====================
+  // Đăng bài
+  // =====================
+  const btnPost = document.getElementById('btn-post');
+  if(btnPost){
+    btnPost.addEventListener('click', function(){
+      const contentEl = document.getElementById('post-content');
+      const content = (contentEl.value || '').trim();
+      if(!content) return alert('Nội dung bài viết không được để trống!');
+      socket.emit("post_feed", {
+        user_id: currentUserId,
+        user_name: "{{ user.name }}",
+        user_picture: "{{ user.picture }}",
+        content: content
+      });
+      contentEl.value = "";
+    });
+  }
+// =====================
+// LOAD FRIENDS + REQUESTS
+// =====================
+document.getElementById("friend-search-btn").addEventListener("click", ()=>{
+  const kw = document.getElementById("friend-search-input").value.trim();
+  if(!kw) return;
+  socket.emit("search_users",{keyword:kw});
 });
 
-function sendFriendRequest(userId, btn){
-  fetch(`/friends/send_request/${userId}`, { method:'POST' })
-    .then(r => r.json())
-    .then(d => {
-      if (d.ok){
-        btn.textContent = 'Đã gửi';
-        btn.disabled = true;
-      } else {
-        alert(d.error || 'Lỗi');
-      }
-    });
-}
-
-function loadFriendRequests(){
-  fetch('/friends/requests')
-    .then(r => r.json())
-    .then(d => {
-      const div = document.getElementById('friend-requests');
-      div.innerHTML = '';
-      if (!d.requests || d.requests.length === 0){
-        div.innerHTML = '<p>Chưa có lời mời nào</p>';
-        return;
-      }
-      d.requests.forEach(req => {
-        const el = document.createElement('div');
-        // Backend hiện trả: { _id, from_user, to_user, time } -> dùng from_user (id) hiển thị
-        el.innerHTML = `
-          <div class="friend-request">
-            <img src="${req.from_user_picture || '/static/default-avatar.png'}" class="avatar" style="width:30px; height:30px; border-radius:50%;">
-            <b>${req.from_user_name || 'Người dùng'}</b>
-            <button onclick="respondFriendRequest('${req._id}','accept', this)">Chấp nhận</button>
-            <button onclick="respondFriendRequest('${req._id}','reject', this)">Từ chối</button>
-          </div>
-        `;
-        div.appendChild(el);
-      });
-    });
-}
-
-function respondFriendRequest(requestId, action, btn){
-  fetch(`/friends/respond_request/${requestId}`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action })
-  }).then(r => r.json())
-    .then(d => {
-      if (d.ok){
-        btn.parentElement.remove();
-        loadFriendList();
-      } else {
-        alert(d.error || 'Lỗi');
-      }
-    });
-}
-
-function loadFriendList(){
-  fetch('/friends/list')
-    .then(r => r.json())
-    .then(d => {
-      const div = document.getElementById('friend-list');
-      div.innerHTML = '';
-      if (!d.friends || d.friends.length === 0){
-        div.innerHTML = '<p>Chưa có bạn bè nào</p>';
-        return;
-      }
-      d.friends.forEach(f => {
-        const el = document.createElement('div');
-        el.textContent = f.name || f.username || f._id;
-        div.appendChild(el);
-        
-      });
-    });
-}
-
-// ===== POST / LIKE / COMMENT =====
-const btnPost = document.getElementById('btn-post');
-if (btnPost){
-  btnPost.addEventListener('click', function(){
-    const contentEl = document.getElementById('post-content');
-    const content = (contentEl.value || '').trim();
-    if (!content) return alert('Nội dung bài viết không được để trống!');
-
-    fetch('/feed/post', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ content })
-    }).then(r => r.json())
-      .then(() => { location.reload(); })
-      .catch(() => alert('Lỗi đăng bài'));
+socket.on("search_results", results=>{
+  const container = document.getElementById("friend-search-results");
+  container.innerHTML = "";
+  results.forEach(u=>{
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${u.name||u.username}</b>
+                     <button id="btn-friend-${u._id}" onclick="sendFriendRequest('${u._id}')">Kết bạn</button>`;
+    container.appendChild(div);
   });
+});
+
+// Gửi lời mời kết bạn
+function sendFriendRequest(toUserId) {
+  socket.emit("send_friend_request", { to_user_id: toUserId });
 }
 
-function likePost(postId, btn){
-  fetch(`/feed/like/${postId}`, { method:'POST' })
-    .then(r => r.json())
-    .then(d => {
-      if (typeof d.likes !== 'undefined') {
-        btn.textContent = `Like (${d.likes})`;
-        if ('liked' in d) btn.classList.toggle('liked', d.liked);
-      } else if (d.error) {
-        alert(d.error);
-      }
-    }).catch(()=>{});
-}
+// Khi server báo đã gửi lời mời thành công
+socket.on("friend_request_sent", data => {
+  console.log("friend_request_sent:", data, "currentUserId:", currentUserId);
 
-function commentPost(postId, input){
-  const content = (input.value||'').trim();
-  if(!content) return;
-  fetch(`/feed/comment/${postId}`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ content })
-  }).then(r=>r.json())
-    .then(d=>{
-      if(!d.error) location.reload();
-      else alert(d.error||'Lỗi');
-    }).catch(()=>alert('Lỗi bình luận'));
-}
-const typeMessages = {
-    "Friend_request": "đã gửi cho bạn lời mời kết bạn",
-    "Friend_request_accepted": "đã chấp nhận lời mời kết bạn của bạn",
-    "Comment": "đã bình luận về bài viết của bạn",
-    "Like": "đã thích bài viết của bạn"
-  };
-
-  function renderNotifications(notifications) {
-    const box = document.getElementById("notifications");
-    box.innerHTML = "";
-
-    notifications.forEach(noti => {
-      const msg = typeMessages[noti.type] || noti.type;
-      box.innerHTML += `
-        <div class="noti-item">
-          <b>${noti.from_user_name}</b> ${msg} <br>
-          <small>${noti.time}</small>
-        </div>
-      `;
-    });
+  // Nếu MÌNH là người gửi
+  if (String(data.from_user_id) === String(currentUserId)) {
+    const btn = document.getElementById("btn-friend-" + data.to_user_id);
+    if (btn) {
+      btn.innerText = "Đã gửi lời mời";
+      btn.disabled = true;
+    }
   }
+
+  // Nếu MÌNH là người được mời
+  if (String(data.to_user_id) === String(currentUserId)) {
+    const reqs = document.getElementById("friend-requests");
+    const div = document.createElement("div");
+    div.id = "req-" + data.from_user_id;
+    div.innerHTML = `
+      <span>${data.from_user_id} đã gửi lời mời</span>
+      <button onclick="acceptFriend('${data.from_user_id}')">Chấp nhận</button>
+      <button onclick="rejectFriend('${data.from_user_id}')">Từ chối</button>
+    `;
+    reqs.appendChild(div);
+  }
+});
+
+// Chấp nhận
+function acceptFriend(fromId) {
+  socket.emit("accept_friend", { from_user_id: fromId });
+  const div = document.getElementById("req-" + fromId);
+  if (div) div.remove();
+}
+
+// Từ chối
+function rejectFriend(fromId) {
+  socket.emit("reject_friend", { from_user_id: fromId });
+  const div = document.getElementById("req-" + fromId);
+  if (div) div.remove();
+}
+
+// Khi server báo đã kết bạn thành công
+socket.on("friend_added", data => {
+  const list = document.getElementById("friend-list");
+  const div = document.createElement("div");
+  div.textContent = "Bạn mới: " + data.friend_id;
+  list.appendChild(div);
+});
+
+
+function loadFriends(){
+  socket.emit("get_friends");
+  socket.emit("get_friend_requests");
+}
+
+socket.on("friends_list", data => {
+  const container = document.getElementById("friend-list");
+  container.innerHTML = "";
+  data.forEach(f=>{
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${f.name||f.username}</b>
+                     <button onclick="openChatWindow({ _id:'${f._id}', name:'${f.name||f.username}', picture:'${f.picture||'/static/default-avatar.png'}' })">Chat</button>
+                     <button onclick="removeFriend('${f._id}')">Xóa</button>`;
+    container.appendChild(div);
+  });
+});
+
+socket.on("friend_requests_list", data => {
+  const container = document.getElementById("friend-requests");
+  container.innerHTML = "";
+  data.forEach(r=>{
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${r.from_user_name}</b>
+                     <button onclick="acceptFriend('${r.from_user_id}')">Đồng ý</button>`;
+    container.appendChild(div);
+  });
+});
+
+
+function removeFriend(id){ socket.emit("remove_friend",{friend_id:id}); }
+// =====================
+// TOAST + SOUND
+// =====================
+function showNotification(msg){
+  // Toast container
+  const containerId = "notification-container-toast";
+  let container = document.getElementById(containerId);
+  if(!container){
+    container = document.createElement("div");
+    container.id = containerId;
+    container.style.cssText = "position:fixed;top:10px;right:10px;z-index:9999;";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.style.cssText = "background:#333;color:#fff;padding:8px 12px;margin-top:5px;border-radius:5px;box-shadow:0 2px 6px rgba(0,0,0,0.3);";
+  toast.innerText = `Tin nhắn mới từ ${msg.sender_name || 'Người lạ'}: ${msg.content}`;
+  container.appendChild(toast);
+  setTimeout(()=> toast.remove(),5000);
+
+  // Sound
+  const audio = new Audio("/static/notify.mp3");
+  audio.play().catch(()=>{});
+}
+// =====================
+// MỞ CHAT
+// =====================
+function openChatWindow(friend) {
+  currentChatPeer = String(friend._id);
+  seenMsgIds.clear();
+  unreadCount = 0;
+  updateMessageBadge();
+
+  const convDiv = document.getElementById("conversations");
+  convDiv.innerHTML = `
+    <div style="display:flex;align-items:center; margin-bottom:10px;">
+      <img src="${friend.picture||'/static/default-avatar.png'}" style="width:40px;height:40px;border-radius:50%;margin-right:8px;">
+      <h4>${friend.name||friend.username||friend._id}</h4>
+    </div>
+    <div id="chat-box" style="border:1px solid #ccc;height:250px;overflow-y:auto;padding:5px;margin-bottom:8px;"></div>
+    <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." style="width:75%;">
+    <button onclick="sendChatMessage()">Gửi</button>
+    <div id="typing-status" style="font-size:12px;color:gray;margin-top:5px;"></div>
+  `;
+
+  socket.emit("join", { peer_id: friend._id });
+
+  // 🚀 Load tin nhắn cũ
+  fetch(`/messages/${friend._id}`)
+    .then(res => res.json())
+    .then(msgs => {
+      msgs.forEach(m => appendMessage(m));
+      socket.emit("mark_seen",{peer_id:friend._id}); // đánh dấu seen
+    });
+}
+
+// =====================
+// APPEND TIN NHẮN
+// =====================
+function appendMessage(msg) {
+  const chatBox = document.getElementById("chat-box");
+  if (!chatBox) return;
+
+  console.log("appendMessage => sender_id:", msg.sender_id, "currentUserId:", currentUserId);
+
+  const isMe = String(msg.sender_id) === String(currentUserId);
+  const div = document.createElement("div");
+  div.className = "chat-message " + (isMe ? "me" : "them");
+
+  div.innerHTML = `
+    <div class="bubble">
+      ${msg.content}
+      <br><small>${new Date(msg.timestamp).toLocaleString()}</small>
+    </div>
+  `;
+
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+
+// =====================
+// GỬI TIN NHẮN
+// =====================
+function sendChatMessage(){
+  const input = document.getElementById("chat-input");
+  if(!input) return;
+  const content = input.value.trim();
+  if(!content||!currentChatPeer) return;
+  socket.emit("send_message",{peer_id:currentChatPeer,content});
+  input.value="";
+}
+
+// =====================
+// SOCKET EVENTS
+// =====================
+socket.on("joined", data => {
+  const chatBox = document.getElementById("chat-box");
+  if(!chatBox) return;
+  chatBox.innerHTML = "";
+  seenMsgIds.clear();
+  data.history.forEach(msg => appendMessage(msg));
+  chatBox.scrollTop = chatBox.scrollHeight;
+});
+
+// =====================
+// TIN NHẮN MỚI
+// =====================
+socket.on("message", msg=>{
+  const isMe = String(msg.sender_id) === String(currentUserId);
+  if(isMe){
+    appendMessage(msg);
+  } else {
+    appendMessage(msg); // append luôn
+    // Nếu chat đang mở → mark_seen
+    if(currentChatPeer === String(msg.sender_id)){
+      socket.emit("mark_seen",{peer_id:msg.sender_id});
+    } else {
+      unreadCount +=1;
+      updateMessageBadge();
+      showNotification(msg);
+    }
+  }
+});
+// =====================
+// SEEN ACK FROM SERVER
+// =====================
+socket.on("seen_ack", data=>{
+  if(currentChatPeer === data.peer_id){
+    unreadCount = 0;
+    updateMessageBadge();
+  }
+});
+
+// =====================
+// TYPING
+// =====================
+function sendTyping(isTyping){
+  if(typingTimeout) clearTimeout(typingTimeout);
+  if(currentChatPeer) socket.emit("typing",{peer_id:currentChatPeer,typing:isTyping});
+  if(isTyping){
+    typingTimeout = setTimeout(()=>sendTyping(false),3000);
+  }
+}
+
+document.addEventListener("input", e=>{
+  if(e.target?.id==="chat-input") sendTyping(true);
+});
+
+document.addEventListener("blur", e=>{
+  if(e.target?.id==="chat-input") sendTyping(false);
+}, true);
+
+socket.on("typing", data=>{
+  const status = document.getElementById("typing-status");
+  if(status) status.innerText = data.typing ? "Đang nhập..." : "";
+});
+
 </script>
 
 </body>
