@@ -19,7 +19,12 @@ def is_friend(db, me: str, peer: str) -> bool:
 
 def save_message(db, sender_id: str, receiver_id: str, content: str) -> dict:
     """Lưu tin nhắn và trả payload đồng bộ với client."""
-    now = datetime.utcnow()
+    from datetime import datetime, timezone, timedelta
+    
+    # Thiết lập múi giờ Việt Nam (UTC+7)
+    tz_vietnam = timezone(timedelta(hours=7))
+    now = datetime.now(tz_vietnam)
+    
     msg = {
         "sender_id": str(sender_id),
         "receiver_id": str(receiver_id),
@@ -28,12 +33,14 @@ def save_message(db, sender_id: str, receiver_id: str, content: str) -> dict:
         "seen": False,
     }
     result = db.messages.insert_one(msg)
+    
+    # Trả về timestamp dưới dạng string đã được format đúng
     return {
         "_id": str(result.inserted_id),
         "sender_id": str(sender_id),
         "receiver_id": str(receiver_id),
         "content": content,
-        "timestamp": now.isoformat(),
+        "timestamp": now.isoformat(),  # Đã bao gồm timezone info
         "seen": False,
     }
 
@@ -75,6 +82,7 @@ def register_friend_events(socketio):
                     "picture": u.get("picture"),
                 })
         emit("friends_list", friend_list)
+    # Sửa hàm on_send_friend_request
     @socketio.on("send_friend_request")
     def on_send_friend_request(data):
         db, me = _require_user()
@@ -85,8 +93,9 @@ def register_friend_events(socketio):
         if not to_id or to_id == me:
             return emit("error", {"error": "INVALID_ID"})
 
-        # Kiểm tra user tồn tại
-        if not db.users.find_one({"_id": ObjectId(to_id)}):
+        # Kiểm tra user tồn tại và lấy thông tin
+        to_user = db.users.find_one({"_id": ObjectId(to_id)})
+        if not to_user:
             return emit("error", {"error": "USER_NOT_FOUND"})
 
         # Kiểm tra đã gửi request trước đó chưa
@@ -97,13 +106,22 @@ def register_friend_events(socketio):
         if is_friend(db, me, to_id):
             return emit("error", {"error": "ALREADY_FRIENDS"})
 
+        # Lấy thông tin người gửi
+        from_user = db.users.find_one({"_id": ObjectId(me)})
+        
         db.friend_requests.insert_one({
             "from_user_id": me,
             "to_user_id": to_id,
             "time": datetime.utcnow(),
         })
 
-        emit("friend_request_sent", {"from_user_id": me, "to_user_id": to_id}, broadcast=True, include_self=True)
+        # Trả về thông tin đầy đủ cho cả người gửi và người nhận
+        emit("friend_request_sent", {
+            "from_user_id": me,
+            "from_user_name": from_user.get("name", from_user.get("username", "Unknown")),
+            "to_user_id": to_id,
+            "to_user_name": to_user.get("name", to_user.get("username", "Unknown"))
+        }, broadcast=True)
 
     @socketio.on("get_friend_requests")
     def on_get_friend_requests():
@@ -126,18 +144,35 @@ def register_friend_events(socketio):
 
     @socketio.on("accept_friend")
     def accept_friend(data):
-        db, me = _require_user()
-        if not me:
-            return
-        from_id = str(data.get("from_user_id"))
-        if not from_id:
-            return
-        # Thêm bạn hai chiều
-        db.friends.insert_one({"user_id": me, "friend_id": from_id})
-        db.friends.insert_one({"user_id": from_id, "friend_id": me})
-        # Xóa yêu cầu
-        db.friend_requests.delete_one({"from_user_id": from_id, "to_user_id": me})
-        emit("friend_added", {"friend_id": from_id}, room=request.sid)
+        try:
+            db, me = _require_user()
+            if not me:
+                return
+            
+            from_id = str(data.get("from_user_id"))
+            if not from_id:
+                return
+            
+            # Lấy thông tin người gửi
+            from_user = db.users.find_one({"_id": ObjectId(from_id)})
+            if not from_user:
+                return emit("error", {"error": "USER_NOT_FOUND"})
+            
+            # Thêm bạn hai chiều
+            db.friends.insert_one({"user_id": me, "friend_id": from_id})
+            db.friends.insert_one({"user_id": from_id, "friend_id": me})
+            
+            # Xóa yêu cầu
+            db.friend_requests.delete_one({"from_user_id": from_id, "to_user_id": me})
+            
+            # Trả về thông tin đầy đủ
+            emit("friend_added", {
+                "friend_id": from_id,
+                "friend_name": from_user.get("name", from_user.get("username", "Unknown")),
+                "friend_picture": from_user.get("picture", "")
+            }, broadcast=True)
+        except Exception as e:
+            emit("error", {"error": "INTERNAL_ERROR", "message": str(e)})
     @socketio.on("reject_friend")
     def reject_friend(data):
         db, me = _require_user()
@@ -153,16 +188,24 @@ def register_friend_events(socketio):
         db, me = _require_user()
         if not me:
             return
+        
         friend_id = str(data.get("friend_id"))
         if not friend_id:
             return
+        
+        # Xóa quan hệ bạn bè hai chiều
         db.friends.delete_many({
             "$or": [
                 {"user_id": me, "friend_id": friend_id},
                 {"user_id": friend_id, "friend_id": me},
             ]
         })
-        emit("friend_removed", {"friend_id": friend_id}, room=request.sid)
+        
+        # Thông báo cho cả hai người
+        emit("friend_removed", {
+            "remover_id": me,
+            "friend_id": friend_id
+        }, broadcast=True)
 
     @socketio.on("search_users")
     def search_users(data):
@@ -188,7 +231,70 @@ def register_friend_events(socketio):
         emit("search_results", results)
 
     # ============== MESSAGES ==============
-
+    @socketio.on("get_conversations")
+    def on_get_conversations():
+        db, me = _require_user()
+        if not me:
+            return emit("conversations_list", [])
+        
+        try:
+            from datetime import timezone, timedelta
+            tz_vietnam = timezone(timedelta(hours=7))
+            
+            friends = list(db.friends.find({"user_id": me}))
+            conversations = []
+            
+            for friend in friends:
+                friend_id = friend["friend_id"]
+                friend_user = db.users.find_one({"_id": ObjectId(friend_id)})
+                if not friend_user:
+                    continue
+                    
+                last_message = db.messages.find_one({
+                    "$or": [
+                        {"sender_id": me, "receiver_id": friend_id},
+                        {"sender_id": friend_id, "receiver_id": me}
+                    ]
+                }, sort=[("timestamp", -1)])
+                
+                unread_count = db.messages.count_documents({
+                    "sender_id": friend_id,
+                    "receiver_id": me,
+                    "seen": False
+                })
+                
+                # Xử lý thời gian đúng cách
+                last_message_time = ""
+                if last_message and last_message.get("timestamp"):
+                    if isinstance(last_message["timestamp"], datetime):
+                        # Chuyển đổi sang múi giờ Việt Nam nếu cần
+                        if last_message["timestamp"].tzinfo is None:
+                            # Nếu timestamp không có timezone, giả định là UTC
+                            last_message_time = last_message["timestamp"].replace(
+                                tzinfo=timezone.utc
+                            ).astimezone(tz_vietnam).isoformat()
+                        else:
+                            last_message_time = last_message["timestamp"].astimezone(
+                                tz_vietnam
+                            ).isoformat()
+                
+                conversation = {
+                    "user_id": friend_id,
+                    "name": friend_user.get("name") or friend_user.get("username") or friend_id,
+                    "picture": friend_user.get("picture", ""),
+                    "last_message": last_message["content"] if last_message else "Nhấn để bắt đầu trò chuyện",
+                    "last_message_time": last_message_time,
+                    "unread_count": unread_count
+                }
+                
+                conversations.append(conversation)
+            
+            conversations.sort(key=lambda x: x["last_message_time"] or "", reverse=True)
+            emit("conversations_list", conversations)
+            
+        except Exception as e:
+            print(f"Error getting conversations: {e}")
+            emit("conversations_list", [])
     @socketio.on("join")
     def on_join(data):
         db, me = _require_user()
@@ -209,14 +315,32 @@ def register_friend_events(socketio):
         }).sort("timestamp", -1).limit(50))
         msgs.reverse()
 
-        history = [{
-            "_id": str(m["_id"]),
-            "sender_id": m["sender_id"],
-            "receiver_id": m["receiver_id"],
-            "content": m["content"],
-            "timestamp": m["timestamp"].isoformat() if isinstance(m.get("timestamp"), datetime) else str(m.get("timestamp")),
-            "seen": m.get("seen", False),
-        } for m in msgs]
+        # Format lại timestamp để đảm bảo đồng nhất timezone
+        history = []
+        for m in msgs:
+            timestamp = m.get("timestamp")
+            if isinstance(timestamp, datetime):
+                # Chuyển đổi sang múi giờ Việt Nam nếu cần
+                from datetime import timezone, timedelta
+                tz_vietnam = timezone(timedelta(hours=7))
+                if timestamp.tzinfo is None:
+                    # Nếu timestamp không có timezone, giả định là UTC
+                    formatted_timestamp = timestamp.replace(
+                        tzinfo=timezone.utc
+                    ).astimezone(tz_vietnam).isoformat()
+                else:
+                    formatted_timestamp = timestamp.astimezone(tz_vietnam).isoformat()
+            else:
+                formatted_timestamp = str(timestamp) if timestamp else ""
+            
+            history.append({
+                "_id": str(m["_id"]),
+                "sender_id": m["sender_id"],
+                "receiver_id": m["receiver_id"],
+                "content": m["content"],
+                "timestamp": formatted_timestamp,
+                "seen": m.get("seen", False),
+            })
 
         emit("joined", {"room": room, "history": history})
 

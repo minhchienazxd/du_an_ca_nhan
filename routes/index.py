@@ -8,11 +8,36 @@ from app.utils.crawl import (
     get_past_5_results_with_stats,
     format_date_for_display
 )
-from datetime import datetime, timedelta, date
-from bson import ObjectId
+from datetime import datetime, timedelta
 
 bp = Blueprint('main', __name__)
 
+# ================= CONTEXT PROCESSOR CHUNG =================
+@bp.app_context_processor
+def inject_common_data():
+    db = get_db()
+    user = session.get("user")
+
+    # FEED
+    posts = list(db.feed.find().sort("time", -1))
+    for p in posts:
+        p["_id"] = str(p["_id"])
+        p["time"] = p["time"].strftime("%d-%m-%Y %H:%M:%S")
+        if "liked_by" not in p: p["liked_by"] = []
+        if "comments" not in p: p["comments"] = []
+        p["liked_by_current_user"] = user and str(user["_id"]) in p["liked_by"]
+
+    # NOTIFICATIONS
+    notifications = list(db.notifications.find().sort("time", -1))
+    unseen_count = sum(1 for n in notifications if not n.get("seen", False))
+    for n in notifications:
+        n["_id"] = str(n["_id"])
+        n["time"] = n["time"].strftime("%d-%m-%Y %H:%M:%S")
+
+    return dict(posts=posts, notifications=notifications, unseen_count=unseen_count, user=user)
+
+
+# ================= HÀM HỖ TRỢ =================
 def get_week_day():
     today = datetime.today()
     db = get_db()
@@ -29,69 +54,54 @@ def get_week_day():
         })
     return days
 
+
+# ================= ROUTES =================
 @bp.route('/')
 def home():
-    print("✅ Đã vào route /")
-    # fetch_and_save_data(date.today())  # BỎ HOẶC DI CHUYỂN RA ROUTE RIÊNG
-
-    result = get_today_result()
-    week_days = get_week_day()
-    user = session.get("user")
     db = get_db()
 
-    # ===== POSTS =====
-    posts = list(db.feed.find().sort("time", -1))
-    for p in posts:
-        p["_id"] = str(p["_id"])
-        p["time"] = p["time"].strftime("%d-%m-%Y %H:%M:%S")
-        if "liked_by" not in p: p["liked_by"] = []
-        if "comments" not in p: p["comments"] = []
-        p["liked_by_current_user"] = session.get("user") and str(session["user"]["_id"]) in p["liked_by"]
-    # ===== NOTIFICATIONS =====
-    notifications = list(db.notifications.find().sort("time", -1))
-    unseen_count = sum(1 for n in notifications if not n.get("seen", False))
-    for n in notifications:
-        n["_id"] = str(n["_id"])
-        n["time"] = n["time"].strftime("%d-%m-%Y %H:%M:%S")
+    # Crawl hôm nay nếu chưa có
+    today_str = datetime.today().strftime("%d-%m-%Y")
+    if not db.kq_xs.find_one({"date": today_str}):
+        try:
+            fetch_and_save_data()
+        except Exception as e:
+            print("❌ Lỗi khi crawl dữ liệu:", e)
+
+    # Kết quả hôm nay
+    result = get_today_result()
+    week_days = get_week_day()
 
     if not result:
-        today = datetime.today()
-        ngay = today.strftime("%d-%m-%Y")
         result = {
-            "date": ngay,
-            "ketqua": {"G1": [], "G2": [], "G3": [], "G4": [], "G5": [], "G6": [], "G7": [], "ĐB": []},
+            "date": today_str,
+            "ketqua": {"ĐB": [], "G1": [], "G2": [], "G3": [], "G4": [], "G5": [], "G6": [], "G7": []},
             "is_waiting": True
         }
+        thong_ke = {str(i): [] for i in range(10)}
     else:
         try:
             result["date"] = datetime.strptime(result["date"], "%d-%m-%Y").strftime("%d-%m-%Y")
         except:
             pass
+        thong_ke = thong_ke_dau_duoi(result["ketqua"])
 
-    thong_ke = thong_ke_dau_duoi(result["ketqua"])
-
+    # Lấy 5 kết quả trước với thống kê
     def wrapper_get_today_result(_):
         return get_today_result()
-
     past_results = get_past_5_results_with_stats(wrapper_get_today_result, thong_ke_dau_duoi)
 
     return render_template(
         'index.html',
         result=result,
         week_days=week_days,
-        user=user,
         thong_ke=thong_ke,
-        past_results=past_results,
-        notifications=notifications,
-        unseen_count=unseen_count,
-        posts=posts
+        past_results=past_results
     )
 
 
 @bp.route("/ket-qua/<ngay>")
 def ket_qua_ngay(ngay):
-    user = session.get("user")
-
     result = get_result_by_date(ngay)
     week_days = get_week_day()
     past_results = get_past_5_results_with_stats(get_result_by_date, thong_ke_dau_duoi)
@@ -111,9 +121,25 @@ def ket_qua_ngay(ngay):
         "index.html",
         result=result,
         week_days=week_days,
-        user=user,
         thong_ke=thong_ke,
-        past_results=past_results,
+        past_results=past_results
     )
 
-# ================== FEED API ==================
+@bp.route('/api/notifications')
+def get_notifications():
+    if 'user' not in session:
+        return jsonify([])
+    
+    db = get_db()
+    user_id = session['user']['_id']
+    
+    notifications = list(db.notifications.find(
+        {"to_user_id": user_id}
+    ).sort("time", -1).limit(50))
+    
+    # Chuyển đổi ObjectId thành string
+    for notification in notifications:
+        notification["_id"] = str(notification["_id"])
+        notification["time"] = notification["time"].strftime("%d-%m-%Y %H:%M:%S")
+    
+    return jsonify(notifications)

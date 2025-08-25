@@ -14,20 +14,73 @@
       gap: 6px;
     }
 
-    /* Thêm CSS comment */
+    /* CSS comment */
     .comments-container { margin-top: 5px; padding-left: 10px; }
     .comment { margin-bottom: 3px; font-size: 0.9em; }
     .post input[type=text] { width: 100%; padding: 4px; margin-top: 5px; }
-    .actions button { cursor: pointer; }
+    .actions button { cursor: pointer; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; background: #f0f0f0; transition: all 0.3s; }
+    .actions button.liked { background-color: #007bff; color: white; border-color: #0056b3; }
 
     /* Highlight post khi từ thông báo */
     .highlight-post { background-color: #fffae6; transition: background 3s; }
 
     /* Notification */
-    .notifications { display: none; margin-top: 10px; }
-    .notification { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
+    .notifications { display: none; margin-top: 10px; max-height: 400px; overflow-y: auto; }
+    .notification { 
+      cursor: pointer; 
+      padding: 10px; 
+      border-bottom: 1px solid #eee; 
+      display: flex;
+      align-items: center;
+    }
     .notification:hover { background-color: #f0f0f0; }
-    .notification.unseen { font-weight: bold; }
+    .notification.unseen { background-color: #e6f7ff; font-weight: bold; }
+    .notification img { 
+      width: 40px; 
+      height: 40px; 
+      border-radius: 50%; 
+      margin-right: 10px; 
+    }
+    .notification-content { flex: 1; }
+    .notification-time { 
+      font-size: 0.8em; 
+      color: #888; 
+      margin-top: 3px; 
+    }
+    .notification-actions { margin-top: 5px; }
+    .notification-actions button { 
+      padding: 3px 8px; 
+      margin-right: 5px; 
+      font-size: 0.8em; 
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .accept-btn { background-color: #4CAF50; color: white; }
+    .reject-btn { background-color: #f44336; color: white; }
+    .toast-notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      max-width: 300px;
+      cursor: pointer;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -193,9 +246,7 @@
         </div>
         <div class="menu-item" onclick="showNotifications()">
           <i class="fas fa-bell fa-lg"></i>
-          {% if unseen_count and unseen_count > 0 %}
-            <span class="badge">{{ unseen_count }}</span>
-          {% endif %}
+          <span id="notification-badge" class="badge" style="display: none;">0</span>
         </div>
         <div class="menu-item" onclick="showMessages()">
           <i class="fas fa-envelope fa-lg" style="position:relative;">
@@ -216,14 +267,15 @@
             <p style="text-align:center; color: gray;">Chưa có bài viết nào. Hãy đăng bài đầu tiên!</p>
           {% else %}
             {% for post in posts %}
-              <div class="post" data-id="{{ post._id }}">
+              <div class="post" data-id="{{ post._id }}" data-owner-id="{{ post.user_id }}">
                 <img src="{{ post.user_picture }}" class="avatar">
                 <b>{{ post.user_name }}</b>
                 <div>{{ post.content }}</div>
                 <small>{{ post.time }}</small>
                 <div class="actions">
                   <button onclick="likePost('{{ post._id }}', this)"
-                          class="{% if post.liked_by_current_user %}liked{% endif %}">
+                          class="{% if post.liked_by_current_user %}liked{% endif %}"
+                          data-liked="{% if post.liked_by_current_user %}true{% else %}false{% endif %}">
                     Like ({{ post.likes | default(0) }})
                   </button>
                 </div>
@@ -241,39 +293,87 @@
       </div>
 
       <div class="friends-table" id="friends-container" style="display:none; padding: 10px;">
-        <h3>Danh sách bạn bè</h3>
-        <input type="text" id="friend-search-input" placeholder="Tìm kiếm bạn bè..." style="width:100%; padding:4px; margin-bottom:5px;">
-        <button id="friend-search-btn">Tìm kiếm</button>
+          <h3>Danh sách bạn bè</h3>
+          <input type="text" id="friend-search-input" placeholder="Tìm kiếm bạn bè..." style="width:100%; padding:4px; margin-bottom:5px;">
+          <button id="friend-search-btn">Tìm kiếm</button>
 
-        <div id="friend-search-results" style="margin-top:5px;"></div>
-        <h4>Lời mời kết bạn</h4>
-        <div id="friend-requests"></div>
-        <h4>Danh sách bạn bè</h4>
-        <div id="friend-list"></div>
+          <div id="friend-search-results" style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;"></div>
+          
+          <h4 style="margin-top:15px;">Lời mời kết bạn</h4>
+          <div id="friend-requests" style="margin-bottom:15px;"></div>
+          
+          <h4>Danh sách bạn bè</h4>
+          <div id="friend-list"></div>
       </div>
 
-      <!-- NOTIFICATIONS (luôn là lịch sử: cả seen & unseen) -->
+      <!-- NOTIFICATIONS -->
       <div class="notifications" id="notifications-container">
-        {% if notifications|length == 0 %}
-          <div class="notification">Chưa có thông báo nào</div>
-        {% else %}
-          {% for n in notifications %}
-            <div class="notification {% if n.seen %}seen{% else %}unseen{% endif %}"
-                 data-id="{{ n._id }}"
-                 data-post="{{ n.post_id }}"
-                 data-type="{{ n.type }}"
-                 onclick="openNotification(this)">
-              <span class="notification-type">{{ n.type|capitalize }}</span>
-              từ <b>{{ n.from_user }}</b>
-              <br><small>{{ n.time }}</small>
-            </div>
-          {% endfor %}
-        {% endif %}
+        <h3>Thông báo</h3>
+        <div id="notifications-list">
+          {% if notifications|length == 0 %}
+            <div class="notification">Chưa có thông báo nào</div>
+          {% else %}
+            {% for n in notifications %}
+              <div class="notification {% if not n.seen %}unseen{% endif %}" 
+                  data-id="{{ n._id }}"
+                  data-type="{{ n.type }}"
+                  data-post-id="{{ n.post_id }}"
+                  data-from-user="{{ n.from_user_id }}"
+                  onclick="handleNotificationClick(this)">
+                <img src="{{ n.from_user_picture }}" onerror="this.src='/static/default-avatar.png'">
+                <div class="notification-content">
+                  <div><b>{{ n.from_user_name }}</b> 
+                    {% if n.type == 'like' %}
+                      đã thích bài viết của bạn
+                    {% elif n.type == 'comment' %}
+                      đã bình luận về bài viết của bạn: "{{ n.content|truncate(30) }}"
+                    {% elif n.type == 'friend_request' %}
+                      muốn kết bạn với bạn
+                    {% elif n.type == 'friend_accept' %}
+                      đã chấp nhận lời mời kết bạn của bạn
+                    {% endif %}
+                  </div>
+                  <div class="notification-time">{{ n.time }}</div>
+                  {% if n.type == 'friend_request' %}
+                  <div class="notification-actions">
+                    <button class="accept-btn" onclick="acceptFriendRequest('{{ n.from_user_id }}', event)">Chấp nhận</button>
+                    <button class="reject-btn" onclick="rejectFriendRequest('{{ n.from_user_id }}', event)">Từ chối</button>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
       </div>
 
       <div class="messages-container" id="messages-container" style="display:none; padding:10px;">
         <h3>Tin nhắn</h3>
-        <div id="conversations"></div>
+        
+        <!-- Danh sách hội thoại -->
+        <div id="conversation-list"></div>
+        
+        <!-- Khung chat (ẩn ban đầu) -->
+        <div id="active-chat" class="conversation-view">
+          <div class="chat-container">
+            <div class="chat-header">
+              <button class="back-button" onclick="backToConversationList()">←</button>
+              <img id="chat-user-avatar" src="/static/default-avatar.png" style="width:40px;height:40px;border-radius:50%;margin-right:10px;">
+              <div>
+                <h4 id="chat-user-name" style="margin:0;">Tên người dùng</h4>
+                <small id="chat-user-status" style="color:#666; font-size:12px;">Đang hoạt động</small>
+              </div>
+            </div>
+            <div class="chat-messages" id="chat-box"></div>
+            <div class="chat-input-container">
+              <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." 
+                    onkeydown="if(event.key==='Enter') sendChatMessage()"
+                    oninput="sendTyping(true)">
+              <button onclick="sendChatMessage()" style="padding:8px 16px; background:#0084ff; color:white; border:none; border-radius:20px; margin-left:8px; cursor:pointer;">Gửi</button>
+            </div>
+            <div id="typing-status" style="font-size:12px;color:gray;margin-top:5px;padding:0 10px;"></div>
+          </div>
+        </div>
       </div>
     </aside>
     {% endif %}
@@ -299,7 +399,7 @@ function showFriends(){
   document.getElementById('notifications-container').style.display = 'none';
   document.getElementById('friends-container').style.display = 'block';
   document.getElementById('messages-container').style.display = 'none';
-  loadFriends(); // <-- thêm dòng này
+  loadFriends();
 }
 
 function showNotifications(){
@@ -307,6 +407,7 @@ function showNotifications(){
   document.getElementById('friends-container').style.display = 'none';
   document.getElementById('notifications-container').style.display = 'block';
   document.getElementById('messages-container').style.display = 'none';
+  updateNotificationBadge();
 }
 
 function showMessages(){
@@ -314,301 +415,876 @@ function showMessages(){
   document.getElementById('friends-container').style.display = 'none';
   document.getElementById('notifications-container').style.display = 'none';
   document.getElementById('messages-container').style.display = 'block';
-
+  loadConversations();
 }
 
 const socket = io();
-const currentUserId = "{{ user._id|string }}";   // server render  // server render
+const currentUserId = "{{ user._id|string }}";
 socket.on("connect", () => console.log("Socket connected!"));
 socket.on("connect_error", err => console.log("Socket connection error:", err));
 let currentChatPeer = null;
 let typingTimeout = null;
 let seenMsgIds = new Set();
 let unreadCount = 0;
+let conversations = [];
+let friends = [];
+let pendingNotifications = []; // Mảng lưu thông báo chưa hiển thị
 
 // =====================
-// CẬP NHẬT BADGE TRÊN SIDEBAR
+// Hiển thị tab thông báo - LOAD TẤT CẢ THÔNG BÁO
 // =====================
-function updateMessageBadge() {
-  const badge = document.getElementById("message-badge");
-  if (!badge) return;
-  if (unreadCount > 0) {
+function showNotifications(){
+  document.getElementById('feed-table').style.display = 'none';
+  document.getElementById('friends-container').style.display = 'none';
+  document.getElementById('notifications-container').style.display = 'block';
+  document.getElementById('messages-container').style.display = 'none';
+  
+  // Hiển thị tất cả thông báo pending khi chuyển sang tab
+  if (pendingNotifications.length > 0) {
+    pendingNotifications.forEach(notification => {
+      addNotificationToUI(notification, true);
+    });
+    pendingNotifications = []; // Xóa các thông báo đã xử lý
+  }
+  
+  updateNotificationBadge();
+}
+
+// =====================
+// Hàm thêm thông báo vào UI
+// =====================
+function addNotificationToUI(notification, isNew = false) {
+  const notificationsList = document.getElementById("notifications-list");
+  if (!notificationsList) return;
+  
+  // Xóa thông báo "Chưa có thông báo nào" nếu có
+  if (notificationsList.textContent.includes("Chưa có thông báo nào")) {
+    notificationsList.innerHTML = '';
+  }
+  
+  const notificationEl = document.createElement("div");
+  notificationEl.className = `notification ${isNew ? 'unseen' : ''}`;
+  notificationEl.setAttribute("data-id", notification._id);
+  notificationEl.setAttribute("data-type", notification.type);
+  notificationEl.setAttribute("data-post-id", notification.post_id || '');
+  notificationEl.setAttribute("data-from-user", notification.from_user_id);
+  notificationEl.onclick = function() { handleNotificationClick(this); };
+  
+  let actionContent = '';
+  let messageContent = '';
+  
+  // Xác định nội dung thông báo
+  switch(notification.type) {
+    case 'like':
+      messageContent = 'đã thích bài viết của bạn';
+      break;
+    case 'comment':
+      const commentText = notification.content ? 
+        'đã bình luận về bài viết của bạn: "' + (notification.content.length > 30 ? notification.content.substring(0, 30) + '...' : notification.content) + '"' : 
+        'đã bình luận về bài viết của bạn';
+      messageContent = commentText;
+      break;
+    case 'friend_request':
+      messageContent = 'muốn kết bạn với bạn';
+      actionContent = `
+        <div class="notification-actions">
+          <button class="accept-btn" onclick="acceptFriendRequest('${notification.from_user_id}', event)">Chấp nhận</button>
+          <button class="reject-btn" onclick="rejectFriendRequest('${notification.from_user_id}', event)">Từ chối</button>
+        </div>
+      `;
+      break;
+    case 'friend_accept':
+      messageContent = 'đã chấp nhận lời mời kết bạn của bạn';
+      break;
+  }
+  
+  notificationEl.innerHTML = `
+    <img src="${notification.from_user_picture || '/static/default-avatar.png'}" onerror="this.src='/static/default-avatar.png'" style="width:40px;height:40px;border-radius:50%;">
+    <div class="notification-content">
+      <div><b>${notification.from_user_name}</b> ${messageContent}</div>
+      <div class="notification-time">${notification.time}</div>
+      ${actionContent}
+    </div>
+  `;
+  
+  // Thêm vào đầu danh sách
+  notificationsList.prepend(notificationEl);
+}
+
+
+// =====================
+// Xử lý click thông báo
+// =====================
+function handleNotificationClick(notificationEl) {
+  const type = notificationEl.getAttribute('data-type');
+  const postId = notificationEl.getAttribute('data-post-id');
+  const fromUserId = notificationEl.getAttribute('data-from-user');
+  const notificationId = notificationEl.getAttribute('data-id');
+  
+  // Đánh dấu đã xem
+  socket.emit("mark_notification_seen", { notification_id: notificationId });
+  notificationEl.classList.remove("unseen");
+  
+  // Xử lý theo loại thông báo
+  if (type === 'like' || type === 'comment') {
+    if (postId) {
+      // Chuyển đến tab feed và highlight bài viết
+      showFeed();
+      
+      // Tìm bài viết và highlight
+      const postElement = document.querySelector(`.post[data-id="${postId}"]`);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth' });
+        postElement.classList.add("highlight-post");
+        setTimeout(() => {
+          postElement.classList.remove("highlight-post");
+        }, 3000);
+      } else {
+        alert("Bài viết không còn tồn tại");
+      }
+    }
+  } else if (type === 'friend_request' || type === 'friend_accept') {
+    // Chuyển đến tab bạn bè
+    showFriends();
+  }
+  
+  // Cập nhật badge
+  updateNotificationBadge();
+}
+
+// Dừng sự kiện click khi nhấn vào nút trong thông báo
+function acceptFriendRequest(userId, event) {
+  event.stopPropagation();
+  socket.emit("accept_friend", { from_user_id: userId });
+}
+
+function rejectFriendRequest(userId, event) {
+  event.stopPropagation();
+  socket.emit("reject_friend", { from_user_id: userId });
+}
+
+// =====================
+// Cập nhật badge thông báo
+// =====================
+function updateNotificationBadge() {
+  const unseenElements = document.querySelectorAll('.notification.unseen');
+  const unseenCount = unseenElements.length + pendingNotifications.length;
+  const badge = document.getElementById("notification-badge");
+  
+  if (unseenCount > 0) {
     badge.style.display = "inline";
-    badge.textContent = unreadCount;
+    badge.textContent = unseenCount > 99 ? "99+" : unseenCount;
   } else {
     badge.style.display = "none";
   }
 }
+
 // =====================
-  // Post mới từ server
-  // =====================
-socket.on("new_post", post => {
-    const container = document.getElementById("posts-container");
-    if(!container) return;
-    const div = document.createElement("div");
-    div.className = "post highlight-post";
-    div.dataset.id = post._id;
-    div.innerHTML = `
-      <img src="${post.user_picture}" class="avatar">
-      <b>${post.user_name}</b>
-      <div>${post.content}</div>
-      <small>${post.time}</small>
-      <div class="actions">
-        <button onclick="likePostSocket('${post._id}', this)">Like (0)</button>
-      </div>
-      <div class="comments-container"></div>
-      <input type="text" placeholder="Viết bình luận..." onkeydown="if(event.key==='Enter') commentPostSocket('${post._id}', this)">
-    `;
-    container.prepend(div);
-    setTimeout(()=> div.classList.remove("highlight-post"), 3000);
-  });
-  // =====================
-  // Like post
-  // =====================
-  function likePost(postId, btn){
-    socket.emit("like_post", { post_id: postId, user_id: currentUserId });
-  }
-  socket.on("update_like", data => {
-      const btn = document.querySelector(`.post[data-id="${data.post_id}"] button`);
-      if(btn) {
-          btn.innerText = `Like (${data.likes})`;
-          if(data.liked) btn.classList.add("liked");
-          else btn.classList.remove("liked");
-      }
-  });
-
-  // =====================
-  // Comment post
-  // =====================
-  function commentPost(postId, input) {
-    if(!currentUserId) return alert("Bạn cần đăng nhập để bình luận.");
-    const content = input.value.trim();
-    if(!content) return;
-    socket.emit("comment_post", {
-        user_id: currentUserId,
-        user_name: "{{ user.name|string if user else '' }}",
-        user_picture: "{{ user.picture|string if user else '' }}",
-        post_id: postId,
-        content: content
-    });
-    input.value = "";
-  }
-
-  socket.on("new_comment", data => {
-      const postEl = document.querySelector(`.post[data-id="${data.post_id}"] .comments-container`);
-      if(postEl) {
-          const c = data.comment;
-          const div = document.createElement("div");
-          div.className = "comment";
-          div.innerHTML = `<b>${c.user_name}</b>: ${c.content} <small>${c.time}</small>`;
-          postEl.appendChild(div);
-      }
-  });
-
-
-  // =====================
-  // Đăng bài
-  // =====================
-  const btnPost = document.getElementById('btn-post');
-  if(btnPost){
-    btnPost.addEventListener('click', function(){
-      const contentEl = document.getElementById('post-content');
-      const content = (contentEl.value || '').trim();
-      if(!content) return alert('Nội dung bài viết không được để trống!');
-      socket.emit("post_feed", {
-        user_id: currentUserId,
-        user_name: "{{ user.name }}",
-        user_picture: "{{ user.picture }}",
-        content: content
-      });
-      contentEl.value = "";
-    });
-  }
+// CẬP NHẬT BADGE TIN NHẮN
 // =====================
-// LOAD FRIENDS + REQUESTS
-// =====================
-document.getElementById("friend-search-btn").addEventListener("click", ()=>{
-  const kw = document.getElementById("friend-search-input").value.trim();
-  if(!kw) return;
-  socket.emit("search_users",{keyword:kw});
-});
-
-socket.on("search_results", results=>{
-  const container = document.getElementById("friend-search-results");
-  container.innerHTML = "";
-  results.forEach(u=>{
-    const div = document.createElement("div");
-    div.innerHTML = `<b>${u.name||u.username}</b>
-                     <button id="btn-friend-${u._id}" onclick="sendFriendRequest('${u._id}')">Kết bạn</button>`;
-    container.appendChild(div);
-  });
-});
-
-// Gửi lời mời kết bạn
-function sendFriendRequest(toUserId) {
-  socket.emit("send_friend_request", { to_user_id: toUserId });
+function updateMessageBadge() {
+  const badge = document.getElementById("message-badge");
+  if (!badge) return;
+  
+  const totalUnread = conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
+  
+  if (totalUnread > 0) {
+    badge.style.display = "inline";
+    badge.textContent = totalUnread > 99 ? "99+" : totalUnread;
+  } else {
+    badge.style.display = "none";
+  }
 }
 
-// Khi server báo đã gửi lời mời thành công
-socket.on("friend_request_sent", data => {
-  console.log("friend_request_sent:", data, "currentUserId:", currentUserId);
+// =====================
+// Thông báo mới từ server - XỬ LÝ REAL-TIME
+// =====================
+socket.on("new_notification", notification => {
+  console.log("Nhận thông báo mới:", notification);
+  
+  // CHỈ xử lý thông báo nếu nó dành cho user hiện tại
+  if (notification.to_user_id && notification.to_user_id !== currentUserId) {
+    console.log("Bỏ qua thông báo không dành cho user hiện tại");
+    return;
+  }
+  
+  // Cập nhật badge
+  updateNotificationBadge();
+  
+  // Kiểm tra xem đang ở tab thông báo hay không
+  const isNotificationTab = document.getElementById('notifications-container').style.display === 'block';
+  
+  if (isNotificationTab) {
+    // Nếu đang ở tab thông báo, thêm ngay vào UI
+    addNotificationToUI(notification, true);
+  } else {
+    // Nếu không ở tab thông báo, lưu vào mảng pending
+    pendingNotifications.push(notification);
+    
+    // Hiển thị toast notification
+    showToastNotification(notification);
+  }
+});
+// =====================
+// Hiển thị toast notification
+// =====================
+function showToastNotification(notification) {
+  let message = '';
+  
+  switch(notification.type) {
+    case 'like':
+      message = `${notification.from_user_name} đã thích bài viết của bạn`;
+      break;
+    case 'comment':
+      message = `${notification.from_user_name} đã bình luận về bài viết của bạn`;
+      break;
+    case 'friend_request':
+      message = `${notification.from_user_name} muốn kết bạn với bạn`;
+      break;
+    case 'friend_accept':
+      message = `${notification.from_user_name} đã chấp nhận lời mời kết bạn`;
+      break;
+    default:
+      message = `Bạn có thông báo mới từ ${notification.from_user_name}`;
+  }
+  
+  const toast = document.createElement("div");
+  toast.className = "toast-notification";
+  toast.innerHTML = `
+    <div style="font-weight: bold;">Thông báo mới</div>
+    <div>${message}</div>
+    <small>${notification.time}</small>
+  `;
+  
+  toast.style.cursor = "pointer";
+  toast.onclick = function() {
+    showNotifications();
+    this.remove();
+  };
+  
+  document.body.appendChild(toast);
+  
+  // Tự động ẩn sau 5 giây
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 5000);
+}
+// =====================
+// Gửi thông báo - SỬA LẠI để chỉ gửi đến user nhận
+// =====================
+function sendNotification(type, toUserId, postId = null, content = null) {
+  // CHỈ gửi thông báo nếu người nhận không phải là chính mình
+  if (toUserId === currentUserId) {
+    console.log("Không gửi thông báo cho chính mình");
+    return;
+  }
+  
+  socket.emit("send_notification", {
+    type: type,
+    post_id: postId,
+    content: content,
+    to_user_id: toUserId,  // QUAN TRỌNG: chỉ gửi đến user nhận
+    from_user_id: currentUserId,
+    from_user_name: "{{ user.name }}",
+    from_user_picture: "{{ user.picture }}"
+  });
+}
+// =====================
+// Post mới từ server
+// =====================
+socket.on("new_post", post => {
+  const container = document.getElementById("posts-container");
+  if(!container) return;
+  
+  const div = document.createElement("div");
+  div.className = "post highlight-post";
+  div.dataset.id = post._id;
+  div.innerHTML = `
+    <img src="${post.user_picture}" class="avatar">
+    <b>${post.user_name}</b>
+    <div>${post.content}</div>
+    <small>${post.time}</small>
+    <div class="actions">
+      <button onclick="likePost('${post._id}', this)" data-liked="false">Like (0)</button>
+    </div>
+    <div class="comments-container"></div>
+    <input type="text" placeholder="Viết bình luận..." 
+          onkeydown="if(event.key==='Enter') commentPost('${post._id}', this)">
+  `;
+  container.prepend(div);
+  setTimeout(() => div.classList.remove("highlight-post"), 3000);
+});
 
-  // Nếu MÌNH là người gửi
-  if (String(data.from_user_id) === String(currentUserId)) {
-    const btn = document.getElementById("btn-friend-" + data.to_user_id);
-    if (btn) {
-      btn.innerText = "Đã gửi lời mời";
-      btn.disabled = true;
+// =====================
+// Like post
+// =====================
+function likePost(postId, button) {
+  // Cập nhật UI ngay lập tức
+  const isLiked = button.getAttribute('data-liked') === 'true';
+  const currentLikes = parseInt(button.textContent.match(/\d+/)[0]);
+  
+  if (isLiked) {
+    // Unlike
+    button.classList.remove("liked");
+    button.setAttribute("data-liked", "false");
+    button.textContent = 'Like (' + (currentLikes - 1) + ')';
+  } else {
+    // Like
+    button.classList.add("liked");
+    button.setAttribute("data-liked", "true");
+    button.textContent = 'Like (' + (currentLikes + 1) + ')';
+  }
+  
+  // Gửi sự kiện đến server
+  socket.emit("like_post", { post_id: postId, user_id: currentUserId });
+  
+  // Gửi thông báo - lấy user_id của chủ bài viết
+  const postElement = document.querySelector('.post[data-id="' + postId + '"]');
+  const postOwnerId = postElement ? postElement.getAttribute('data-owner-id') : null;
+  
+  if (postOwnerId && postOwnerId !== currentUserId) {
+    sendNotification("like", postOwnerId, postId);
+  }
+}
+
+
+socket.on("update_like", data => {
+  const postElement = document.querySelector(`.post[data-id="${data.post_id}"]`);
+  if (!postElement) return;
+  
+  const likeButton = postElement.querySelector('.actions button');
+  if (likeButton) {
+    likeButton.textContent = 'Like (' + data.likes + ')';
+    
+    // Chỉ cập nhật trạng thái like cho user hiện tại
+    if (data.user_id === currentUserId) {
+      if (data.liked) {
+        likeButton.classList.add("liked");
+        likeButton.setAttribute("data-liked", "true");
+      } else {
+        likeButton.classList.remove("liked");
+        likeButton.setAttribute("data-liked", "false");
+      }
     }
   }
+});
 
-  // Nếu MÌNH là người được mời
-  if (String(data.to_user_id) === String(currentUserId)) {
-    const reqs = document.getElementById("friend-requests");
+// =====================
+// Comment post
+// =====================
+function commentPost(postId, input) {
+  if(!currentUserId) {
+    alert("Bạn cần đăng nhập để bình luận.");
+    return;
+  }
+  
+  const content = input.value.trim();
+  if(!content) return;
+  
+  socket.emit("comment_post", {
+    user_id: currentUserId,
+    user_name: "{{ user.name }}",
+    user_picture: "{{ user.picture }}",
+    post_id: postId,
+    content: content
+  });
+  
+  // Gửi thông báo - lấy user_id của chủ bài viết
+  const postElement = document.querySelector('.post[data-id="' + postId + '"]');
+  const postOwnerId = postElement ? postElement.getAttribute('data-owner-id') : null;
+  
+  if (postOwnerId && postOwnerId !== currentUserId) {
+    sendNotification("comment", postOwnerId, postId, content);
+  }
+  
+  input.value = "";
+}
+
+
+socket.on("new_comment", data => {
+  const postEl = document.querySelector(`.post[data-id="${data.post_id}"] .comments-container`);
+  if(postEl) {
+    const c = data.comment;
     const div = document.createElement("div");
-    div.id = "req-" + data.from_user_id;
-    div.innerHTML = `
-      <span>${data.from_user_id} đã gửi lời mời</span>
-      <button onclick="acceptFriend('${data.from_user_id}')">Chấp nhận</button>
-      <button onclick="rejectFriend('${data.from_user_id}')">Từ chối</button>
-    `;
-    reqs.appendChild(div);
+    div.className = "comment";
+    div.innerHTML = `<b>${c.user_name}</b>: ${c.content} <small>${c.time}</small>`;
+    postEl.appendChild(div);
   }
 });
 
-// Chấp nhận
-function acceptFriend(fromId) {
-  socket.emit("accept_friend", { from_user_id: fromId });
-  const div = document.getElementById("req-" + fromId);
-  if (div) div.remove();
+// =====================
+// Đăng bài
+// =====================
+const btnPost = document.getElementById('btn-post');
+if(btnPost){
+  btnPost.addEventListener('click', function(){
+    const contentEl = document.getElementById('post-content');
+    const content = (contentEl.value || '').trim();
+    if(!content) return alert('Nội dung bài viết không được để trống!');
+    socket.emit("post_feed", {
+      user_id: currentUserId,
+      user_name: "{{ user.name }}",
+      user_picture: "{{ user.picture }}",
+      content: content
+    });
+    contentEl.value = "";
+  });
 }
 
-// Từ chối
-function rejectFriend(fromId) {
-  socket.emit("reject_friend", { from_user_id: fromId });
-  const div = document.getElementById("req-" + fromId);
-  if (div) div.remove();
+// =====================
+// GỬI LỜI MỜI KẾT BẠN
+// =====================
+function sendFriendRequest(userId) {
+  socket.emit("send_friend_request", { to_user_id: userId });
+  
+  // Gửi thông báo
+  sendNotification("friend_request", userId);
 }
 
-// Khi server báo đã kết bạn thành công
-socket.on("friend_added", data => {
-  const list = document.getElementById("friend-list");
-  const div = document.createElement("div");
-  div.textContent = "Bạn mới: " + data.friend_id;
-  list.appendChild(div);
+// Xử lý khi gửi lời mời thành công
+socket.on("friend_request_sent", data => {
+  // Cập nhật nút trên kết quả tìm kiếm
+  const btn = document.querySelector(`#friend-search-results button[data-id='${data.to_user_id}']`);
+  if (btn) {
+    btn.innerText = "Đã gửi lời mời";
+    btn.disabled = true;
+    btn.classList.add("pending");
+    btn.onclick = null;
+  }
 });
 
+// =====================
+// THÊM LỜI MỜI VÀO DANH SÁCH
+// =====================
+function addFriendRequest(userId, userName) {
+  const requestsContainer = document.getElementById("friend-requests");
+  const existingRequest = document.getElementById(`req-${userId}`);
+  
+  if (existingRequest) {
+    existingRequest.remove();
+  }
+  
+  const div = document.createElement("div");
+  div.id = `req-${userId}`;
+  div.className = "request-item";
+  div.innerHTML = `
+    <div>
+      <img src="/static/default-avatar.png" style="width:30px;height:30px;border-radius:50%;margin-right:8px;">
+      <span>${userName} đã gửi lời mời</span>
+    </div>
+    <div>
+      <button onclick="acceptFriend('${userId}')">Chấp nhận</button>
+      <button onclick="rejectFriend('${userId}')">Từ chối</button>
+    </div>
+  `;
+  requestsContainer.appendChild(div);
+}
 
-function loadFriends(){
+// =====================
+// CHẤP NHẬN KẾT BẠN
+// =====================
+function acceptFriend(userId) {
+  socket.emit("accept_friend", { from_user_id: userId });
+}
+
+// Xử lý khi kết bạn thành công
+socket.on("friend_added", data => {
+  // Xóa khỏi danh sách lời mời
+  const requestDiv = document.getElementById(`req-${data.friend_id}`);
+  if (requestDiv) {
+    requestDiv.remove();
+  }
+  
+  // Thêm vào danh sách bạn bè
+  addFriendToList(data.friend_id, data.friend_name, data.friend_picture);
+
+  // Gửi thông báo chấp nhận kết bạn
+  sendNotification("friend_accept", data.friend_id);
+});
+
+// =====================
+// THÊM BẠN VÀO DANH SÁCH
+// =====================
+function addFriendToList(friendId, friendName, friendPicture) {
+  const friendList = document.getElementById("friend-list");
+  const existingFriend = document.querySelector(`#friend-list div[data-id='${friendId}']`);
+  
+  if (existingFriend) {
+    existingFriend.remove();
+  }
+  
+  const div = document.createElement("div");
+  div.className = "friend-item";
+  div.dataset.id = friendId;
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;">
+      <img src="${friendPicture || '/static/default-avatar.png'}" style="width:30px;height:30px;border-radius:50%;margin-right:8px;">
+      <b>${friendName}</b>
+    </div>
+    <div>
+      <button onclick="openChatWindow({ _id:'${friendId}', name:'${friendName}', picture:'${friendPicture}' })">Chat</button>
+      <button onclick="removeFriend('${friendId}')">Xóa</button>
+    </div>
+  `;
+  friendList.appendChild(div);
+}
+
+// =====================
+// XÓA BẠN
+// =====================
+function removeFriend(friendId) {
+  if (confirm("Bạn có chắc muốn xóa người này khỏi danh sách bạn bè?")) {
+    socket.emit("remove_friend", { friend_id: friendId });
+  }
+}
+
+// Xử lý khi xóa bạn thành công
+socket.on("friend_removed", data => {
+  // Xóa khỏi danh sách bạn bè
+  const friendDiv = document.querySelector(`#friend-list div[data-id='${data.friend_id}']`);
+  if (friendDiv) {
+    friendDiv.remove();
+  }
+  
+  // Nếu đang chat với người này, đóng chat
+  if (currentChatPeer === data.friend_id) {
+    currentChatPeer = null;
+    document.getElementById("messages-container").innerHTML = "<h3>Tin nhắn</h3><div id='conversations'></div>";
+  }
+});
+
+function rejectFriend(userId) {
+  socket.emit("reject_friend", { from_user_id: userId });
+}
+
+// Xử lý khi từ chối thành công
+socket.on("friend_rejected", data => {
+  const requestDiv = document.getElementById(`req-${data.from_user_id}`);
+  if (requestDiv) {
+    requestDiv.remove();
+  }
+});
+
+// =====================
+// TẢI DANH SÁCH BẠN BÈ
+// =====================
+function loadFriends() {
   socket.emit("get_friends");
   socket.emit("get_friend_requests");
 }
 
-socket.on("friends_list", data => {
+// =====================
+// CẬP NHẬT GIAO DIỆN KHI TÌM KIẾM
+// =====================
+socket.on("search_results", results => {
+  const container = document.getElementById("friend-search-results");
+  container.innerHTML = "";
+  
+  results.forEach(user => {
+    const div = document.createElement("div");
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.marginBottom = "8px";
+    div.innerHTML = `
+      <img src="${user.picture || '/static/default-avatar.png'}" style="width:30px;height:30px;border-radius:50%;margin-right:8px;">
+      <b>${user.name || user.username || user._id}</b>
+      <button data-id="${user._id}" onclick="sendFriendRequest('${user._id}')" style="margin-left:auto;">Kết bạn</button>
+    `;
+    container.appendChild(div);
+  });
+});
+
+// Xử lý danh sách bạn bè từ server
+socket.on("friends_list", friendsData => {
+  friends = friendsData;
   const container = document.getElementById("friend-list");
   container.innerHTML = "";
-  data.forEach(f=>{
+  
+  friendsData.forEach(friend => {
     const div = document.createElement("div");
-    div.innerHTML = `<b>${f.name||f.username}</b>
-                     <button onclick="openChatWindow({ _id:'${f._id}', name:'${f.name||f.username}', picture:'${f.picture||'/static/default-avatar.png'}' })">Chat</button>
-                     <button onclick="removeFriend('${f._id}')">Xóa</button>`;
+    div.className = "friend-item";
+    div.dataset.id = friend._id;
+    div.innerHTML = `
+      <div class="friend-info">
+        <img src="${friend.picture || '/static/default-avatar.png'}" style="width:40px;height:40px;border-radius:50%;margin-right:10px;">
+        <div>
+          <b>${friend.name || friend.username || friend._id}</b>
+        </div>
+      </div>
+      <div class="friend-actions">
+        <button onclick="openChatWindow({ _id:'${friend._id}', name:'${friend.name || friend.username}', picture:'${friend.picture}' })">Chat</button>
+        <button onclick="removeFriend('${friend._id}')">Xóa</button>
+      </div>
+    `;
     container.appendChild(div);
   });
 });
 
-socket.on("friend_requests_list", data => {
+// Xử lý danh sách lời mời kết bạn
+socket.on("friend_requests_list", requests => {
   const container = document.getElementById("friend-requests");
   container.innerHTML = "";
-  data.forEach(r=>{
+  
+  requests.forEach(req => {
     const div = document.createElement("div");
-    div.innerHTML = `<b>${r.from_user_name}</b>
-                     <button onclick="acceptFriend('${r.from_user_id}')">Đồng ý</button>`;
+    div.id = `req-${req.from_user_id}`;
+    div.className = "request-item";
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;">
+        <img src="${req.from_user_picture || '/static/default-avatar.png'}" style="width:30px;height:30px;border-radius:50%;margin-right:8px;">
+        <span>${req.from_user_name} đã gửi lời mời</span>
+      </div>
+      <div>
+        <button onclick="acceptFriend('${req.from_user_id}')">Chấp nhận</button>
+        <button onclick="rejectFriend('${req.from_user_id}')">Từ chối</button>
+      </div>
+    `;
     container.appendChild(div);
   });
 });
 
-
-function removeFriend(id){ socket.emit("remove_friend",{friend_id:id}); }
-// =====================
-// TOAST + SOUND
-// =====================
-function showNotification(msg){
-  // Toast container
-  const containerId = "notification-container-toast";
-  let container = document.getElementById(containerId);
-  if(!container){
-    container = document.createElement("div");
-    container.id = containerId;
-    container.style.cssText = "position:fixed;top:10px;right:10px;z-index:9999;";
-    document.body.appendChild(container);
+// Xử lý kết quả tìm kiếm
+document.getElementById("friend-search-btn").addEventListener("click", function() {
+  const keyword = document.getElementById("friend-search-input").value.trim();
+  if (keyword) {
+    socket.emit("search_users", { keyword: keyword });
   }
+});
 
-  const toast = document.createElement("div");
-  toast.style.cssText = "background:#333;color:#fff;padding:8px 12px;margin-top:5px;border-radius:5px;box-shadow:0 2px 6px rgba(0,0,0,0.3);";
-  toast.innerText = `Tin nhắn mới từ ${msg.sender_name || 'Người lạ'}: ${msg.content}`;
-  container.appendChild(toast);
-  setTimeout(()=> toast.remove(),5000);
-
-  // Sound
-  const audio = new Audio("/static/notify.mp3");
-  audio.play().catch(()=>{});
-}
 // =====================
-// MỞ CHAT
+// TẢI DANH SÁCH HỘI THOẠI
+// =====================
+function loadConversations() {
+  socket.emit("get_conversations");
+}
+
+// LẮNG NGHE PHẢN HỒI DANH SÁCH HỘI THOẠI TỪ SERVER
+socket.on("conversations_list", (conversationsData) => {
+  conversations = conversationsData;
+  updateMessageBadge();
+  renderConversationList();
+});
+
+// =====================
+// HIỂN THỊ DANH SÁCH HỘI THOẠI
+// =====================
+function renderConversationList() {
+  const container = document.getElementById('conversation-list');
+  if (!container) return;
+  
+  if (!currentChatPeer) {
+    document.getElementById('active-chat').classList.remove('active-conversation');
+    container.style.display = 'block';
+  }
+  
+  if (conversations.length === 0) {
+    container.innerHTML = '<div class="empty-chat"><i class="fas fa-comments fa-3x"></i><p>Chưa có cuộc trò chuyện nào</p></div>';
+    return;
+  }
+  
+  // Sắp xếp hội thoại: có tin nhắn chưa đọc lên đầu, sau đó theo thời gian
+  const sortedConversations = [...conversations].sort((a, b) => {
+    if (a.unread_count > 0 && b.unread_count === 0) return -1;
+    if (a.unread_count === 0 && b.unread_count > 0) return 1;
+    
+    const aTime = new Date(a.last_message_time || 0);
+    const bTime = new Date(b.last_message_time || 0);
+    return bTime - aTime;
+  });
+  
+  let html = '<div class="conversation-list">';
+  
+  sortedConversations.forEach(conv => {
+    const isActive = currentChatPeer === conv.user_id;
+    const unread = conv.unread_count > 0 ? `<span class="unread-count">${conv.unread_count}</span>` : '';
+    const lastTime = conv.last_message_time ? formatTime(new Date(conv.last_message_time)) : '';
+    
+    html += `
+      <div class="conversation-item ${isActive ? 'active' : ''}" data-id="${conv.user_id}" onclick="selectConversation('${conv.user_id}')">
+        <img src="${conv.picture || '/static/default-avatar.png'}" style="width:50px;height:50px;border-radius:50%;" onerror="this.src='/static/default-avatar.png'">
+        <div class="conversation-info">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div class="conversation-name">${conv.name}</div>
+            <div class="conversation-time">${lastTime}</div>
+          </div>
+          <div class="conversation-preview">${conv.last_message || 'Chưa có tin nhắn'}</div>
+        </div>
+        ${unread}
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// =====================
+// ĐỊNH DẠNG THỜI GIAN
+// =====================
+function formatTime(dateString) {
+  if (!dateString) return '';
+  
+  try {
+    let date = new Date(dateString);
+    
+    if (isNaN(date.getTime())) {
+      if (dateString.indexOf('+') === -1 && dateString.indexOf('Z') === -1) {
+        date = new Date(dateString + '+07:00');
+      } else {
+        date = new Date(dateString);
+      }
+    }
+    
+    if (isNaN(date.getTime())) return '';
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    const formatTime = () => {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+    
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays === 1) return `Hôm qua, ${formatTime()}`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}, ${formatTime()}`;
+    
+  } catch (e) {
+    console.error('Error formatting time:', e, dateString);
+    return '';
+  }
+}
+
+// =====================
+// QUAY LẠI DANH SÁCH HỘI THOẠI
+// =====================
+function backToConversationList() {
+  document.getElementById('active-chat').classList.remove('active-conversation');
+  document.getElementById('conversation-list').style.display = 'block';
+  currentChatPeer = null;
+  renderConversationList();
+}
+
+// =====================
+// CHỌN CUỘC TRÒ CHUYỆN TỪ DANH SÁCH
+// =====================
+function selectConversation(userId) {
+  const conversation = conversations.find(c => c.user_id === userId);
+  if (!conversation) return;
+  
+  socket.emit("mark_seen", {peer_id: userId});
+  
+  const convIndex = conversations.findIndex(c => c.user_id === userId);
+  if (convIndex !== -1) {
+    conversations[convIndex].unread_count = 0;
+    updateMessageBadge();
+    renderConversationList();
+  }
+  
+  openChatWindow({
+    _id: conversation.user_id,
+    name: conversation.name,
+    picture: conversation.picture
+  });
+}
+
+// =====================
+// MỞ CHAT TỪ TRANG BẠN BÈ HOẶC DANH SÁCH HỘI THOẠI
 // =====================
 function openChatWindow(friend) {
+  showMessages();
+  
   currentChatPeer = String(friend._id);
   seenMsgIds.clear();
-  unreadCount = 0;
-  updateMessageBadge();
-
-  const convDiv = document.getElementById("conversations");
-  convDiv.innerHTML = `
-    <div style="display:flex;align-items:center; margin-bottom:10px;">
-      <img src="${friend.picture||'/static/default-avatar.png'}" style="width:40px;height:40px;border-radius:50%;margin-right:8px;">
-      <h4>${friend.name||friend.username||friend._id}</h4>
-    </div>
-    <div id="chat-box" style="border:1px solid #ccc;height:250px;overflow-y:auto;padding:5px;margin-bottom:8px;"></div>
-    <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." style="width:75%;">
-    <button onclick="sendChatMessage()">Gửi</button>
-    <div id="typing-status" style="font-size:12px;color:gray;margin-top:5px;"></div>
-  `;
+  
+  const conversationIndex = conversations.findIndex(c => c.user_id === friend._id);
+  if (conversationIndex !== -1 && conversations[conversationIndex].unread_count > 0) {
+    conversations[conversationIndex].unread_count = 0;
+    updateMessageBadge();
+    renderConversationList();
+  }
+  
+  document.getElementById('conversation-list').style.display = 'none';
+  document.getElementById('active-chat').classList.add('active-conversation');
+  
+  document.getElementById('chat-user-avatar').src = friend.picture || '/static/default-avatar.png';
+  document.getElementById('chat-user-name').textContent = friend.name || friend.username || friend._id;
+  
+  const chatBox = document.getElementById("chat-box");
+  chatBox.innerHTML = "";
 
   socket.emit("join", { peer_id: friend._id });
-
-  // 🚀 Load tin nhắn cũ
-  fetch(`/messages/${friend._id}`)
-    .then(res => res.json())
-    .then(msgs => {
-      msgs.forEach(m => appendMessage(m));
-      socket.emit("mark_seen",{peer_id:friend._id}); // đánh dấu seen
-    });
 }
 
 // =====================
-// APPEND TIN NHẮN
+// XỬ LÝ TIN NHẮN TỪ SERVER
+// =====================
+socket.on("joined", data => {
+  const chatBox = document.getElementById("chat-box");
+  if(!chatBox) return;
+  
+  chatBox.innerHTML = "";
+  data.history.forEach(msg => appendMessage(msg));
+  scrollChatToBottom();
+});
+
+socket.on("message", msg => {
+  const isMe = String(msg.sender_id) === String(currentUserId);
+  const senderId = String(msg.sender_id);
+  
+  updateConversationList(msg, isMe);
+  
+  if (currentChatPeer === senderId) {
+    appendMessage(msg);
+    socket.emit("mark_seen", {peer_id: senderId});
+  } else if (!isMe) {
+    showNotification(msg, senderId);
+  }
+});
+
+// =====================
+// HIỂN THỊ TIN NHẮN
 // =====================
 function appendMessage(msg) {
   const chatBox = document.getElementById("chat-box");
   if (!chatBox) return;
 
-  console.log("appendMessage => sender_id:", msg.sender_id, "currentUserId:", currentUserId);
-
   const isMe = String(msg.sender_id) === String(currentUserId);
   const div = document.createElement("div");
   div.className = "chat-message " + (isMe ? "me" : "them");
 
+  const timeString = formatTime(msg.timestamp);
+
   div.innerHTML = `
     <div class="bubble">
       ${msg.content}
-      <br><small>${new Date(msg.timestamp).toLocaleString()}</small>
+      <small>${timeString}</small>
     </div>
   `;
 
   chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
+  scrollChatToBottom();
 }
 
+function scrollChatToBottom() {
+  const chatBox = document.getElementById("chat-box");
+  if (chatBox) {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+}
 
 // =====================
 // GỬI TIN NHẮN
@@ -617,76 +1293,189 @@ function sendChatMessage(){
   const input = document.getElementById("chat-input");
   if(!input) return;
   const content = input.value.trim();
-  if(!content||!currentChatPeer) return;
-  socket.emit("send_message",{peer_id:currentChatPeer,content});
-  input.value="";
+  if(!content || !currentChatPeer) return;
+  
+  const tempMsg = {
+    _id: 'temp-' + Date.now(),
+    sender_id: currentUserId,
+    content: content,
+    timestamp: new Date().toISOString(),
+    seen: false
+  };
+  
+  appendMessage(tempMsg);
+  
+  socket.emit("send_message", {peer_id: currentChatPeer, content});
+  input.value = "";
+  sendTyping(false);
 }
 
 // =====================
-// SOCKET EVENTS
-// =====================
-socket.on("joined", data => {
-  const chatBox = document.getElementById("chat-box");
-  if(!chatBox) return;
-  chatBox.innerHTML = "";
-  seenMsgIds.clear();
-  data.history.forEach(msg => appendMessage(msg));
-  chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-// =====================
-// TIN NHẮN MỚI
-// =====================
-socket.on("message", msg=>{
-  const isMe = String(msg.sender_id) === String(currentUserId);
-  if(isMe){
-    appendMessage(msg);
-  } else {
-    appendMessage(msg); // append luôn
-    // Nếu chat đang mở → mark_seen
-    if(currentChatPeer === String(msg.sender_id)){
-      socket.emit("mark_seen",{peer_id:msg.sender_id});
-    } else {
-      unreadCount +=1;
-      updateMessageBadge();
-      showNotification(msg);
-    }
-  }
-});
-// =====================
-// SEEN ACK FROM SERVER
-// =====================
-socket.on("seen_ack", data=>{
-  if(currentChatPeer === data.peer_id){
-    unreadCount = 0;
-    updateMessageBadge();
-  }
-});
-
-// =====================
-// TYPING
+// XỬ LÝ TYPING
 // =====================
 function sendTyping(isTyping){
   if(typingTimeout) clearTimeout(typingTimeout);
-  if(currentChatPeer) socket.emit("typing",{peer_id:currentChatPeer,typing:isTyping});
+  if(currentChatPeer) socket.emit("typing", {peer_id: currentChatPeer, typing: isTyping});
   if(isTyping){
-    typingTimeout = setTimeout(()=>sendTyping(false),3000);
+    typingTimeout = setTimeout(() => sendTyping(false), 3000);
   }
 }
 
-document.addEventListener("input", e=>{
-  if(e.target?.id==="chat-input") sendTyping(true);
-});
-
-document.addEventListener("blur", e=>{
-  if(e.target?.id==="chat-input") sendTyping(false);
-}, true);
-
-socket.on("typing", data=>{
+socket.on("typing", data => {
   const status = document.getElementById("typing-status");
-  if(status) status.innerText = data.typing ? "Đang nhập..." : "";
+  if(status) {
+    status.innerText = data.typing ? 'Đang nhập...' : '';
+  }
 });
 
+// =====================
+// CẬP NHẬT DANH SÁCH HỘI THOẠI KHI CÓ TIN NHẮN MỚI
+// =====================
+function updateConversationList(msg, isMe) {
+  const senderId = String(msg.sender_id);
+  let conversationIndex = conversations.findIndex(c => c.user_id === senderId);
+  
+  if (conversationIndex === -1) {
+    const friend = friends.find(f => f._id === senderId);
+    if (!friend) return;
+    
+    conversations.unshift({
+      user_id: senderId,
+      name: friend.name || friend.username || senderId,
+      picture: friend.picture,
+      last_message: msg.content,
+      last_message_time: new Date().toISOString(),
+      unread_count: 0
+    });
+    
+    conversationIndex = 0;
+  }
+  
+  conversations[conversationIndex].last_message = msg.content;
+  conversations[conversationIndex].last_message_time = new Date().toISOString();
+  
+  if (!isMe && currentChatPeer !== senderId) {
+    conversations[conversationIndex].unread_count = (conversations[conversationIndex].unread_count || 0) + 1;
+    
+    if (conversationIndex > 0) {
+      const [movedItem] = conversations.splice(conversationIndex, 1);
+      conversations.unshift(movedItem);
+    }
+  }
+  
+  if (!currentChatPeer) {
+    renderConversationList();
+  }
+  updateMessageBadge();
+}
+
+// =====================
+// HIỂN THỊ THÔNG BÁO TIN NHẮN MỚI
+// =====================
+function showNotification(msg, senderId) {
+  const friend = friends.find(f => f._id === senderId);
+  const senderName = friend ? (friend.name || friend.username) : "Người lạ";
+  
+  const toast = document.createElement("div");
+  toast.className = "toast-notification";
+  toast.innerHTML = `
+    <div><b>${senderName}</b></div>
+    <div>${msg.content}</div>
+  `;
+  
+  toast.style.cursor = "pointer";
+  toast.onclick = function() {
+    openChatWindow({
+      _id: senderId,
+      name: senderName,
+      picture: friend ? friend.picture : '/static/default-avatar.png'
+    });
+    this.remove();
+  };
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 3000);
+}
+// =====================
+// Tải thông báo khi khởi động
+// =====================
+function loadNotifications() {
+  fetch('/api/notifications')
+    .then(response => response.json())
+    .then(notifications => {
+      const notificationsList = document.getElementById("notifications-list");
+      if (notifications.length === 0) {
+        notificationsList.innerHTML = '<div class="notification">Chưa có thông báo nào</div>';
+      } else {
+        notificationsList.innerHTML = '';
+        notifications.forEach(notification => {
+          addNotificationToUI(notification, !notification.seen);
+        });
+      }
+      updateNotificationBadge();
+    })
+    .catch(error => {
+      console.error('Lỗi tải thông báo:', error);
+    });
+}
+// Khởi tạo
+socket.on("connect", () => {
+  console.log("Socket connected!", socket.id);
+
+  socket.emit("join_user_room", { user_id: currentUserId });
+  loadFriends();
+
+  // Xóa listener cũ và thêm listener mới cho thông báo
+  socket.off("new_notification");
+  socket.on("new_notification", notification => {
+    console.log("Nhận thông báo mới:", notification);
+    
+    // CHỈ xử lý thông báo nếu nó dành cho user hiện tại
+    if (notification.to_user_id && notification.to_user_id !== currentUserId) {
+      console.log("Bỏ qua thông báo không dành cho user hiện tại");
+      return;
+    }
+    
+    // Cập nhật badge
+    updateNotificationBadge();
+
+    // Nếu đang ở tab thông báo, thêm thông báo mới vào danh sách
+    const isNotificationTab = document.getElementById('notifications-container').style.display === 'block';
+    
+    if (isNotificationTab) {
+      // Nếu đang ở tab thông báo, thêm ngay vào UI
+      addNotificationToUI(notification, true);
+    } else {
+      // Nếu không ở tab thông báo, lưu vào mảng pending
+      pendingNotifications.push(notification);
+      
+      // Hiển thị toast notification
+      showToastNotification(notification);
+    }
+  });
+  
+  setTimeout(() => {
+    loadConversations();
+  }, 500);
+});
+
+// =====================
+// KIỂM TRA TẤT CẢ TRẠNG THÁI KHI TẢI TRANG
+// =====================
+document.addEventListener('DOMContentLoaded', function() {
+  if (currentUserId) {
+    loadNotifications();
+    loadConversations();
+  }
+  
+  // Cập nhật badge thông báo khi tải trang
+  updateNotificationBadge();
+});
 </script>
 
 </body>
