@@ -25,7 +25,7 @@ def inject_common_data():
         p["time"] = p["time"].strftime("%d-%m-%Y %H:%M:%S")
         if "liked_by" not in p: p["liked_by"] = []
         if "comments" not in p: p["comments"] = []
-        p["liked_by_current_user"] = user and str(user["_id"]) in p["liked_by"]
+        p["liked_by_current_user"] = str(user.get("_id")) in p["liked_by"] if user else False
 
     # NOTIFICATIONS
     notifications = list(db.notifications.find().sort("time", -1))
@@ -87,9 +87,7 @@ def home():
         thong_ke = thong_ke_dau_duoi(result["ketqua"])
 
     # Lấy 5 kết quả trước với thống kê
-    def wrapper_get_today_result(_):
-        return get_today_result()
-    past_results = get_past_5_results_with_stats(wrapper_get_today_result, thong_ke_dau_duoi)
+    past_results = get_past_5_results_with_stats(get_result_by_date, thong_ke_dau_duoi, exclude_date=result.get("date"))
 
     return render_template(
         'index.html',
@@ -127,7 +125,7 @@ def ket_qua_ngay(ngay):
 
 @bp.route('/api/notifications')
 def get_notifications():
-    if 'user' not in session:
+    if 'user' not in session or "_id" not in session['user']:
         return jsonify([])
     
     db = get_db()

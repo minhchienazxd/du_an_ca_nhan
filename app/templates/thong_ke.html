@@ -2,50 +2,124 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Thống kê lô tô</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='thong_ke.css') }}">
 </head>
 <body>
+  <div class="container">
+    <header>
+      <h1>Thống kê lô tô</h1>
+      <p class="description">Thống kê tần suất xuất hiện của các con số theo ngày</p>
+    </header>
+    
+    <form class="filters" method="get" action="/thong-ke">
+      <div class="filter-group">
+        <label for="from-date">Từ ngày:</label>
+        <!-- from_iso/to_iso do backend truyền vào, định dạng YYYY-MM-DD -->
+        <input type="date" id="from-date" name="from" required value="{{ from_iso|default('', true) }}">
+        
+        <label for="to-date">Đến ngày:</label>
+        <input type="date" id="to-date" name="to" required value="{{ to_iso|default('', true) }}">
+      </div>
 
-  <h1>Thống kê lô tô</h1>
-
-  <form method="get" action="/thong-ke">
-    <label>Từ ngày:</label>
-    <input type="date" name="from" required>
-    <label>Đến ngày:</label>
-    <input type="date" name="to" required>
-    <button type="submit">Lọc</button>
-    <a href="/" class="back-btn">Quay lại trang chủ</a>
-  </form>
-
-  <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr>
-          <th class="ngay">Ngày</th>
-          {% for i in range(100) %}
-            <th>{{ "%02d"|format(i) }}</th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in data %}
+      <div class="actions">
+        <button type="submit">
+          <i class="fas fa-filter"></i> Lọc kết quả
+        </button>
+        <a href="/" class="back-btn">
+          <i class="fas fa-arrow-left"></i> Trang chủ
+        </a>
+      </div>
+    </form>
+    
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #ffffff;"></div>
+        <span>Không xuất hiện</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #7876f7;"></div>
+        <span>Xuất hiện 1 lần</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #0e15de;"></div>
+        <span>Xuất hiện từ 2 lần trở lên</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #ec4343;"></div>
+        <span>Lô đặc biệt</span>
+      </div>
+    </div>
+    
+    <div class="table-container">
+      <table>
+        <thead>
           <tr>
-            <td class="ngay">{{ row.date }}</td>
+            <th class="ngay">Ngày</th>
             {% for i in range(100) %}
-              {% set so = "%02d"|format(i) %}
-              {% set count = row.counts.get(so, 0) %}
-              <td class="
-                  {% if so in row.db %}db{% elif count >= 2 %}nhay-2{% elif count == 1 %}nhay-1{% else %}nhay-0{% endif %}
-              ">
-                {% if count >= 2 %}{{ count }}{% endif %}
-              </td>
+              <th>{{ "%02d"|format(i) }}</th>
             {% endfor %}
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for row in data %}
+            <tr>
+              <td class="ngay">{{ row.date }}</td>
+              {% for i in range(100) %}
+                {% set so = "%02d"|format(i) %}
+                {% set count = row.counts.get(so, 0) %}
+                <td class="tooltip {{ 'db' if so in row.db else ('nhay-2' if count >= 2 else ('nhay-1' if count == 1 else 'nhay-0')) }}"
+                    data-tooltip="Ngày {{ row.date }}{% if so in row.db %} - Lô đặc biệt{% endif %}: Số {{ so }} xuất hiện {{ count }} lần">
+                  {% if count >= 2 %}{{ count }}{% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="footer">
+      <p>Dữ liệu được cập nhật mới nhất vào {{ current_date }}</p>
+    </div>
   </div>
 
+  <script>
+    // Thiết lập ngày mặc định (7 ngày gần nhất)
+    document.addEventListener('DOMContentLoaded', function() {
+      const fromDateInput = document.getElementById('from-date');
+      const toDateInput = document.getElementById('to-date');
+      
+      // Kiểm tra nếu các trường ngày không có giá trị
+      if (!fromDateInput.value) {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        fromDateInput.valueAsDate = oneWeekAgo;
+      }
+      
+      if (!toDateInput.value) {
+        toDateInput.valueAsDate = new Date();
+      }
+
+      
+      // Thêm hiệu ứng cho các ô khi di chuột
+      const cells = document.querySelectorAll('td:not(.ngay)');
+      cells.forEach(cell => {
+        cell.addEventListener('mouseenter', function() {
+          this.style.transform = 'scale(1.1)';
+          this.style.zIndex = '5';
+          this.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+        });
+        
+        cell.addEventListener('mouseleave', function() {
+          this.style.transform = 'scale(1)';
+          this.style.zIndex = '1';
+          this.style.boxShadow = 'none';
+        });
+      });
+    });
+  </script>
 </body>
 </html>

@@ -2,322 +2,606 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Phân Tích SXMB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân Tích SXMB - Trang Chủ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        button {
-            margin: 4px;
-            padding: 6px 12px;
-        }
-        .section {
-            display: none;
-            margin-top: 20px;
-        }
-        .grid-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-        gap: 10px;
-        max-width: 900px;
-        margin: 20px auto;
-        }
-
-        .cell {
-            background-color: #f7f7f7;
-            padding: 15px;
-            text-align: center;
-            font-weight: bold;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            position: relative;
-            cursor: default;
-            transition: background-color 0.3s;
-        }
-
-        .cell:hover {
-            background-color: #e4e4e4;
-        }
-
-        .detail-box {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 999;
-            width: 300px;
-            background-color: #fff;
-            padding: 10px;
-            border: 1px solid #aaa;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            font-size: 13px;
-            border-radius: 6px;
-            margin-top: 5px;
-        }
-
-        .cell:hover .detail-box {
-            display: block;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='phan_tich.css') }}">
+</head>
 </head>
 <body>
-    <h1>Phân tích SXMB</h1>
-    <div>
-        <button onclick="showSection('cham')">Chạm</button>
-        <button onclick="showSection('tong_lo')">Tổng lô</button>
-        <button onclick="showSection('lo_roi')">Lô rơi</button>
-        <button onclick="showSection('cau_ngang')">Cầu ngang</button>
-        <button onclick="showSection('cau_cheo')">Cầu chéo</button>
-        <button onclick="showSection('thu')">Thống kê theo thứ</button>
-        <button onclick="showSection('lap_deu')">Lặp đều</button>
-        <button onclick="showSection('chuoi_lien_tiep')">Chuỗi liên tiếp</button>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <h1>Phân Tích SXMB</h1>
+                </div>
+                <div id="current-date" style="font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="nav-tabs">
+            <button class="tab-btn active" onclick="showSection('cham')">
+                <i class="fas fa-fire"></i> Chạm
+            </button>
+            <button class="tab-btn" onclick="showSection('tong_lo')">
+                <i class="fas fa-calculator"></i> Tổng lô
+            </button>
+            <button class="tab-btn" onclick="showSection('lo_roi')">
+                <i class="fas fa-sync-alt"></i> Lô rơi
+            </button>
+            <button class="tab-btn" onclick="showSection('cau_ngang')">
+                <i class="fas fa-arrows-alt-h"></i> Cầu ngang
+            </button>
+            <button class="tab-btn" onclick="showSection('cau_cheo')">
+                <i class="fas fa-arrows-alt"></i> Cầu chéo
+            </button>
+            <button class="tab-btn" onclick="showSection('phan_tich_thu')">
+                <i class="fas fa-calendar"></i> Theo thứ
+            </button>
+            <button class="tab-btn" onclick="showSection('lap_deu')">
+                <i class="fas fa-redo"></i> Lặp đều
+            </button>
+        </nav>
+
+        <main>
+            <!-- CHẠM -->
+            <section id="cham" class="section active">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-fire"></i> Phân tích Chạm</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="cham">
+                    <button type="button" class="btn" onclick="analyze('cham')"><i class="fas fa-sync"></i> Phân tích Chạm</button>
+                </form>
+                
+                <div class="loading" id="loading-cham" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="cham-content">
+                    {% if cham_data %}
+                    <div class="chart-container">
+                        <canvas id="chamChart"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- TỔNG LÔ -->
+            <section id="tong_lo" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-calculator"></i> Phân tích Tổng Lô</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="tong_lo">
+                    <button type="button" class="btn" onclick="analyze('tong_lo')"><i class="fas fa-sync"></i> Phân tích Tổng Lô</button>
+                </form>
+                
+                <div class="loading" id="loading-tong_lo" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="tong_lo-content">
+                    {% if tong_lo_data %}
+                    {% set tong_lo_list = tong_lo_data.items()|list %}
+                    {% for ngay, tong_data in tong_lo_list[:3] %}
+                    <div style="margin-bottom: 40px;">
+                        <h4>Ngày {{ ngay }}</h4>
+                        {% if tong_data %}
+                        <div class="chart-container">
+                            <canvas id="chart_tong_{{ loop.index }}"></canvas>
+                        </div>
+                        {% else %}
+                        <p>Không có tổng nào trong ngày này.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- LÔ RƠI -->
+            <section id="lo_roi" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-sync-alt"></i> Phân tích Lô Rơi</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="lo_roi">
+                    <button type="button" class="btn" onclick="analyze('lo_roi')"><i class="fas fa-sync"></i> Phân tích Lô Rơi</button>
+                </form>
+                
+                <div class="loading" id="loading-lo_roi" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="lo_roi-content">
+                    {% if lo_roi_data %}
+                    <div class="chart-container">
+                        <canvas id="chart_lo_roi"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- CẦU NGANG -->
+            <section id="cau_ngang" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-arrows-alt-h"></i> Phân tích Cầu Ngang</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="cau_ngang">
+                    <button type="button" class="btn" onclick="analyze('cau_ngang')"><i class="fas fa-sync"></i> Phân tích Cầu Ngang</button>
+                </form>
+                
+                <div class="loading" id="loading-cau_ngang" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="cau_ngang-content">
+                    {% if cau_ngang %}
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Số cầu ngang tìm thấy</div>
+                            <div class="stat-value">{{ cau_ngang|length }}</div>
+                            <div class="stat-desc">Cầu ngang</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-container">
+                        {% for cau in cau_ngang %}
+                        <div class="cell">
+                            <div class="final-number">
+                                <strong>{{ cau.final }}</strong>
+                                <span style="font-size: 0.8em; color: #777;">/{{ cau.final_reverse }}</span>
+                                <br>
+                                <span style="font-size: 0.7em;">({{ cau.so_ngay }} ngày)</span>
+                            </div>
+                            <div class="detail-box">
+                                <strong>Nguồn:</strong> {{ cau.source }}<br>
+                                <strong>Lịch sử:</strong><br>
+                                {% for date, pair in cau.history %}
+                                <div style="margin-bottom: 2px;">
+                                    {{ date }} → {{ pair }}
+                                </div>
+                                {% endfor %}
+                                {% if cau.so_ngay >= 2 %}
+                                <div style="margin-top: 5px; color: green; font-weight: bold;">
+                                    Dự đoán: {{ cau.final }} có khả năng về ngày tiếp theo
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% elif action == 'cau_ngang' %}
+                    <p style="text-align: center; font-style: italic;">Không tìm thấy cầu ngang nào trong 7 ngày gần nhất.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- CẦU CHÉO -->
+            <section id="cau_cheo" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-arrows-alt"></i> Phân tích Cầu Chéo</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="cau_cheo">
+                    <button type="button" class="btn" onclick="analyze('cau_cheo')"><i class="fas fa-sync"></i> Phân tích Cầu Chéo</button>
+                </form>
+                
+                <div class="loading" id="loading-cau_cheo" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="cau_cheo-content">
+                    {% if cau_cheo_data %}
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Số cầu chéo tìm thấy</div>
+                            <div class="stat-value">{{ cau_cheo_data|length }}</div>
+                            <div class="stat-desc">Cầu chéo</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-container">
+                        {% for cap_so, cau_list in cau_cheo_data.items() %}
+                        <div class="cell">
+                            <a href="{{ url_for('thong_ke.chi_tiet_cau_cheo', cap_so=cap_so) }}" 
+                            class="so-cau" 
+                            style="display: block; text-decoration: none; color: inherit;">
+                                <div class="so-chinh">{{ cap_so }}/{{ cap_so[1] + cap_so[0] }}</div>
+                                <div class="so-luong">{{ cau_list|length }} cầu</div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% elif action == 'cau_cheo' %}
+                    <p style="text-align: center;">Không tìm thấy cầu chéo nào.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- PHÂN TÍCH THEO THỨ -->
+            <section id="phan_tich_thu" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-calendar"></i> Phân tích theo Thứ</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="phan_tich_thu">
+                    <button type="button" class="btn" onclick="analyze('phan_tich_thu')"><i class="fas fa-sync"></i> Phân tích theo Thứ</button>
+                </form>
+                
+                <div class="loading" id="loading-phan_tich_thu" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="phan_tich_thu-content">
+                    {% if phan_tich_thu_data %}
+                    <div style="max-width: 1000px; margin: 0 auto; padding: 20px;">
+                        {% for thu, data in phan_tich_thu_data.items() %}
+                        <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff;">
+                            <h3 style="margin: 0 0 10px 0; color: #2c3e50;">{{ thu }} ({{ data.tong_so_ngay }} ngày dữ liệu)</h3>
+                            
+                            {% if data.top_3 %}
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                {% for item in data.top_3 %}
+                                <div style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <div style="font-size: 1.5em; font-weight: bold; color: #e74c3c; text-align: center;">
+                                        {{ item.so }}
+                                    </div>
+                                    <div style="text-align: center; color: #7f8c8d; font-size: 0.9em;">
+                                        {{ item.xac_suat }}% ({{ item.so_lan }}/{{ data.tong_so_ngay }})
+                                    </div>
+                                    <div style="font-size: 0.8em; color: #95a5a6; margin-top: 5px;">
+                                        {% for ngay in item.ngay_ve %}
+                                        {{ ngay }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p style="color: #7f8c8d; font-style: italic;">Không có dữ liệu</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% elif action == 'phan_tich_thu' %}
+                    <p style="text-align: center; color: #7f8c8d;">Không có dữ liệu để phân tích.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- LẶP ĐỀU -->
+            <section id="lap_deu" class="section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-redo"></i> Phân tích Lặp Đều</h2>
+                </div>
+                
+                <form method="POST" class="analysis-form">
+                    <input type="hidden" name="action" value="lap_deu">
+                    <button type="button" class="btn" onclick="analyze('lap_deu')"><i class="fas fa-sync"></i> Phân tích Lặp Đều</button>
+                </form>
+                
+                <div class="loading" id="loading-lap_deu" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="lap_deu-content">
+                    {% if lap_deu_data %}
+                    <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                            {% for so, data in lap_deu_data.items() %}
+                            <div style="background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-size: 1.8em; font-weight: bold; color: #e74c3c;">{{ so }}</span>
+                                    <span style="background: #3498db; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.9em;">
+                                        {{ data.so_lan }} lần
+                                    </span>
+                                </div>
+                                
+                                <div style="margin-bottom: 10px;">
+                                    <strong>Chu kỳ:</strong> 
+                                    {% for pattern in data.patterns %}
+                                    <span style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 8px; margin: 0 2px; font-size: 0.9em;">
+                                        {{ pattern.chu_ky }} ngày ({{ pattern.do_chinh_xac }}%)
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div style="font-size: 0.9em; color: #7f8c8d;">
+                                    <strong>Lịch sử:</strong><br>
+                                    {% for ngay in data.lich_su[-5:] %}
+                                    <span style="background: #f8f9fa; padding: 2px 6px; border-radius: 4px; margin: 2px; display: inline-block;">
+                                        {{ ngay }}
+                                    </span>
+                                    {% endfor %}
+                                    {% if data.lich_su|length > 5 %}
+                                    <span style="color: #95a5a6;">... (+{{ data.lich_su|length - 5 }} ngày)</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <div style="margin-top: 10px; font-size: 0.8em; color: #27ae60;">
+                                    <strong>Ngày gần nhất:</strong> {{ data.ngay_gan_nhat }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% elif action == 'lap_deu' %}
+                    <p style="text-align: center; color: #7f8c8d;">Không tìm thấy số nào có chu kỳ lặp đều.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </main>
     </div>
+    <button type="button" onclick="window.location.href='/'">Quay lại trang chủ</button>
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="disclaimer">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <strong>Lưu ý:</strong> Thông tin trên trang web chỉ mang tính chất tham khảo, 
+                    chúng tôi không chịu trách nhiệm cho bất kỳ quyết định nào dựa trên thông tin này. 
+                    Xổ số là hình thức giải trí may rủi, hãy chơi có trách nhiệm.
+                </div>
+                <div>© 2023 Phân Tích SXMB. All rights reserved.</div>
+            </div>
+        </div>
+    </footer>
 
-    <!-- Tần suất lô -->
-    <!-- CHẠM -->
-    <div id="cham" class="section" {% if action == 'cham' %}style="display:block"{% else %}style="display:none"{% endif %}>
-    <h2>Phân tích Chạm</h2>
-    <form method="POST">
-        <input type="hidden" name="action" value="cham">
-        <button type="submit">Phân tích Chạm</button>
-    </form>
+    <script>
+        // Hiển thị ngày hiện tại
+        const now = new Date();
+        document.getElementById('current-date').textContent = now.toLocaleDateString('vi-VI', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
 
-    {% if cham_data %}
-        <h3>Chạm ngày {{ cham_data.ngay }}</h3>
+        // Chuyển đổi giữa các phần
+        function showSection(sectionId) {
+            // Ẩn tất cả các phần
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Bỏ active tất cả các nút
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Hiển thị phần được chọn
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Active nút được chọn
+            document.querySelector(`.tab-btn[onclick="showSection('${sectionId}')"]`).classList.add('active');
 
-        <!-- Hiển thị danh sách -->
+            // Lưu tab hiện tại
+            localStorage.setItem("activeTab", sectionId);
 
+            // Cuộn lên đầu trang
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        // Khi load lại trang → mở tab đã lưu
+        window.addEventListener("load", () => {
+            const savedTab = localStorage.getItem("activeTab") || "cham";
+            showSection(savedTab);
+        });
+        // Hàm giả lập phân tích dữ liệu
+        function analyze(section) {
+            const loadingEl = document.getElementById(`loading-${section}`);
+            const contentEl = document.getElementById(`${section}-content`);
+            
+            // Hiển thị loading
+            loadingEl.style.display = 'flex';
+            
+            // Giả lập thời gian phân tích
+            setTimeout(() => {
+                // Ẩn loading
+                loadingEl.style.display = 'none';
+                
+                // Ở đây sẽ là code gửi form thực sự
+                // Trong demo này, chúng ta chỉ giả lập
+                document.querySelector(`form input[name="action"][value="${section}"]`).closest('form').submit();
+            }, 1000);
+            
+            // Ngăn form submit mặc định
+            return false;
+        }
 
-        <!-- Vẽ biểu đồ -->
-        <canvas id="chamChart" width="600" height="300"></canvas>
-        <script>
+        // Khởi tạo biểu đồ nếu có dữ liệu
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if cham_data %}
             const ctx = document.getElementById('chamChart').getContext('2d');
             const chamChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: {{ cham_data.cham.keys()|list|sort|safe }},  // chạm 0–9
+                    labels: {{ cham_data.cham.keys()|list|sort|safe }},
                     datasets: [{
                         label: 'Số lần xuất hiện',
                         data: {{ cham_data.cham.values()|list|safe }},
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: [
+                            '#16a085', '#2980b9', '#8e44ad', '#e74c3c', '#f39c12',
+                            '#d35400', '#c0392b', '#27ae60', '#2c3e50', '#7f8c8d'
+                        ],
                         borderWidth: 1
                     }]
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Biểu đồ tần suất Chạm',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: 'Số lần' }
-                        },
-                        x: {
-                            title: { display: true, text: 'Chạm (0–9)' }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        title: {
-                            display: true,
-                            text: 'Biểu đồ tần suất Chạm'
+                            title: {
+                                display: true,
+                                text: 'Số lần xuất hiện'
+                            }
                         }
                     }
                 }
             });
-        </script>
-    {% endif %}
-</div>
+            {% endif %}
+            
+            {% if tong_lo_data %}
+            {% set tong_lo_list = tong_lo_data.items()|list %}
+            {% for ngay, tong_data in tong_lo_list[:3] %}
+            {% if tong_data %}
+            const ctx{{ loop.index }} = document.getElementById('chart_tong_{{ loop.index }}').getContext('2d');
+            new Chart(ctx{{ loop.index }}, {
+                type: 'bar',
+                data: {
+                    labels: {{ tong_data.keys()|list }},
+                    datasets: [{
+                        label: 'Tổng số lần',
+                        data: {{ tong_data.values()|list }},
+                        backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0,
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+            
+            {% if lo_roi_data %}
+            const days = {{ lo_roi_data.ngay_labels | tojson }};
+            const datasets = [];
 
+            const colors = [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)',
+                'rgba(199, 199, 199, 1)',
+                'rgba(83, 102, 255, 1)',
+                'rgba(255, 102, 255, 1)',
+                'rgba(102, 255, 153, 1)'
+            ];
 
-    <!-- TỔNG LÔ -->
-    <div id="tong_lo" class="section" {% if action == 'tong_lo' %}style="display:block"{% endif %}>
-    <h2>Phân tích Tổng lô (≥ 3 ngày liên tiếp)</h2>
-    <form method="POST">
-        <input type="hidden" name="action" value="tong_lo">
-        <button type="submit">Phân tích Tổng Lô</button>
-    </form>
+            let colorIndex = 0;
 
-    {% if tong_lo_data %}
-        {% set tong_lo_list = tong_lo_data.items()|list %}
-        {% for ngay, tong_data in tong_lo_list[:7] %}
-            <div style="margin-bottom: 40px;">
-                <h4>Ngày {{ ngay }}</h4>
-                {% if tong_data %}
+            {% for loai, data in [('Lô Thường', lo_roi_data.lo_thuong), ('Lô ĐB', lo_roi_data.lo_db)] %}
+                {% for cap_so, day_ranges in data.items() %}
+                    {
+                        let dataPoints = new Array(days.length).fill(null);
 
-                    <!-- Biểu đồ tổng lô -->
-                    <canvas id="chart_tong_{{ loop.index }}"></canvas>
-                    <script>
-                        const ctx{{ loop.index }} = document.getElementById('chart_tong_{{ loop.index }}').getContext('2d');
-                        new Chart(ctx{{ loop.index }}, {
-                            type: 'bar',
-                            data: {
-                                labels: {{ tong_data.keys()|list }},
-                                datasets: [{
-                                    label: 'Tổng số lần',
-                                    data: {{ tong_data.values()|list }},
-                                    backgroundColor: 'rgba(255, 159, 64, 0.6)',
-                                    borderColor: 'rgba(255, 159, 64, 1)',
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                plugins: {
-                                    legend: { display: false }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        ticks: {
-                                            precision: 0,
-                                            stepSize: 1
-                                        }
-                                    }
+                        {% for start_day, end_day in day_ranges %}
+                            days.forEach((d, idx) => {
+                                if (d >= '{{ start_day }}' && d <= '{{ end_day }}') {
+                                    dataPoints[idx] = parseInt('{{ cap_so }}');
+                                }
+                            });
+                        {% endfor %}
+
+                        datasets.push({
+                            label: '{{ cap_so }} ({{ loai }})',
+                            data: dataPoints,
+                            fill: false,
+                            borderColor: colors[colorIndex % colors.length],
+                            backgroundColor: colors[colorIndex % colors.length],
+                            tension: 0.3,
+                            pointRadius: 5,
+                            spanGaps: true
+                        });
+
+                        colorIndex++;
+                    }
+                {% endfor %}
+            {% endfor %}
+
+            new Chart(document.getElementById("chart_lo_roi").getContext("2d"), {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 12,
+                                font: {
+                                    size: 10
                                 }
                             }
-                        });
-                    </script>
-                {% else %}
-                    <p>Không có tổng nào trong ngày này.</p>
-                {% endif %}
-            </div>
-        {% endfor %}
-    {% else %}
-        <p>Chưa có dữ liệu để phân tích.</p>
-    {% endif %}
-</div>
-
-    <!-- Các phần đang phát triển -->
-    <div id="lo_roi" class="section" {% if action == 'lo_roi' %}style="display:block"{% else %}style="display:none"{% endif %}>
-    <h2>Phân tích Lô Rơi (trong 7 ngày gần nhất)</h2>
-    <form method="POST">
-        <input type="hidden" name="action" value="lo_roi">
-        <button type="submit">Phân tích Lô Rơi</button>
-    </form>
-
-    {% if lo_roi_data %}
-{% set all_days = lo_roi_data.ngay_labels %}
-<h3>Biểu đồ Lô Rơi:</h3>
-<canvas id="chart_lo_roi" height="400"></canvas>
-<script>
-    const days = {{ all_days | tojson }};
-    const datasets = [];
-
-    const colors = [
-        'rgba(255, 99, 132, 1)',
-        'rgba(54, 162, 235, 1)',
-        'rgba(255, 206, 86, 1)',
-        'rgba(75, 192, 192, 1)',
-        'rgba(153, 102, 255, 1)',
-        'rgba(255, 159, 64, 1)',
-        'rgba(199, 199, 199, 1)',
-        'rgba(83, 102, 255, 1)',
-        'rgba(255, 102, 255, 1)',
-        'rgba(102, 255, 153, 1)'
-    ];
-
-    let colorIndex = 0;
-
-    {% for loai, data in [('Lô Thường', lo_roi_data.lo_thuong), ('Lô ĐB', lo_roi_data.lo_db)] %}
-        {% for cap_so, day_ranges in data.items() %}
-            {
-                let dataPoints = new Array(days.length).fill(null);
-
-                {% for start_day, end_day in day_ranges %}
-                    days.forEach((d, idx) => {
-                        if (d >= '{{ start_day }}' && d <= '{{ end_day }}') {
-                            dataPoints[idx] = parseInt('{{ cap_so }}');
                         }
-                    });
-                {% endfor %}
-
-                datasets.push({
-                    label: '{{ cap_so }} ({{ loai }})',
-                    data: dataPoints,
-                    fill: false,
-                    borderColor: colors[colorIndex % colors.length],
-                    backgroundColor: colors[colorIndex % colors.length],
-                    tension: 0.3,
-                    pointRadius: 5,
-                    spanGaps: true
-                });
-
-                colorIndex++;
-            }
-        {% endfor %}
-    {% endfor %}
-
-    new Chart(document.getElementById("chart_lo_roi").getContext("2d"), {
-        type: 'line',
-        data: {
-            labels: days,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: true }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Cặp số (Lô rơi)' }
-                },
-                x: {
-                    title: { display: true, text: 'Ngày' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { 
+                                display: true, 
+                                text: 'Cặp số (Lô rơi)',
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value % 1 === 0 ? value : null;
+                                }
+                            }
+                        },
+                        x: {
+                            title: { 
+                                display: true, 
+                                text: 'Ngày',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        }
-    });
-</script>
-{% endif %}
-
-
-
-
-</div>
-    <div id="cau_ngang" class="section" {% if action == 'cau_ngang' %}style="display:block"{% else %}style="display:none"{% endif %}>
-    <h2 style="text-align: center;">Phân tích Cầu Ngang (trong 7 ngày gần nhất)</h2>
-    <form method="POST" style="text-align: center;">
-        <input type="hidden" name="action" value="cau_ngang">
-        <button type="submit">Phân tích Cầu Ngang</button>
-    </form>
-
-    {% if cau_ngang %}
-    <div class="grid-container">
-        {% for cap_so, chi_tiet_list in cau_ngang.items() %}
-        <div class="cell">
-            {{ cap_so }}
-            <div class="detail-box">
-                {% for item in chi_tiet_list %}
-                    <div style="margin-bottom: 8px;">
-                        <strong>{{ item.ngay1 }}:</strong>
-                        {% for giai, lan, pos in item.vitri_ngay1 %}
-                            [{{ giai }} - {{ lan }} - vị trí {{ pos }}]
-                        {% endfor %}
-                        → <strong>{{ item.ngay2 }}</strong> (trùng với: {{ item.xuat_hien_o_ngay2 }})
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% elif action == 'cau_ngang' %}
-        <p style="text-align: center;">Không tìm thấy cặp số nào là cầu ngang trong 7 ngày gần nhất.</p>
-    {% endif %}
-</div>
-
-    
-
-
-    <div id="cau_cheo" class="section"><p>Chức năng đang phát triển</p></div>
-    <div id="thu" class="section"><p>Chức năng đang phát triển</p></div>
-    <div id="lap_deu" class="section"><p>Chức năng đang phát triển</p></div>
-    <div id="chuoi_lien_tiep" class="section"><p>Chức năng đang phát triển</p></div>
-
-    <script>
-        function showSection(id) {
-            document.querySelectorAll('.section').forEach(div => div.style.display = 'none');
-            document.getElementById(id).style.display = 'block';
-        }
+            });
+            {% endif %}
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chi tiết cầu {{ cap_so }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .cau-item { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .back-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Chi tiết cầu {{ cap_so }}</h1>
+    <p>Cặp đảo: {{ cap_so_dao }}</p>
+    <p>Tổng số: {{ cau_list|length }} cầu</p>
+
+    {% for cau in cau_list %}
+    <div class="cau-item">
+        <h3>Vị trí: {{ cau.source }}</h3>
+        <p>Lịch sử:</p>
+        <ul>
+            {% for date, pair in cau.history %}
+            <li>{{ date }} → {{ pair }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+
+    <button class="back-btn" onclick="history.back()">← Quay lại</button>
+</body>
+</html>
