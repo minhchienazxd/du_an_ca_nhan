@@ -65,8 +65,27 @@
                 
                 <div id="cham-content">
                     {% if cham_data %}
+                    <h4>
+                        hân tích chạm ({{ cham_data.date_range }})
+                    </h4>
                     <div class="chart-container">
                         <canvas id="chamChart"></canvas>
+                    </div>
+
+                    <div class="strong-touch">
+                        <h4>🔥 Chạm mạnh (theo ĐB, >= 2 lần)</h4>
+                        {% if cham_data.cham %}
+                        <ul>
+                            {% for digit, info in cham_data.cham.items() %}
+                            <li>
+                                <strong>{{ digit }}</strong>: {{ info.count }} lần 
+                                (ngày về: {{ info.dates|join(", ") }})
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p>Không có chạm mạnh trong 7 ngày gần nhất.</p>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -120,12 +139,59 @@
                 <div class="loading" id="loading-lo_roi" style="display: none;">
                     <div class="spinner"></div>
                 </div>
-                
                 <div id="lo_roi-content">
+                
                     {% if lo_roi_data %}
-                    <div class="chart-container">
-                        <canvas id="chart_lo_roi"></canvas>
-                    </div>
+                        <!-- Lô rơi từ ĐB -->
+                        <h3>Lô rơi từ giải ĐB</h3>
+                        <p>
+                        Trong {{ lo_roi_data.db.count }} lần xảy ra ({{ lo_roi_data.db.from }} → {{ lo_roi_data.db.to }}), 
+                        trung bình {{ lo_roi_data.db.avg_gap }} ngày mới có một lần lô rơi. 
+                        Lần gần nhất cách đây {{ lo_roi_data.db.last_gap }} ngày. 
+                        → <b>Xác suất ngày mai ≈ {{ lo_roi_data.db.xac_suat }}%</b>.
+                        </p>
+                        <details>
+                        <summary>Chi tiết các lần rơi</summary>
+                        <ul>
+                            {% for ct in lo_roi_data.db.chi_tiet %}
+                            <li>{{ ct }}</li>
+                            {% endfor %}
+                        </ul>
+                        </details>
+
+                        <!-- Lô rơi từ nhiều nháy -->
+                        <h3>Lô rơi từ nhiều nháy</h3>
+                        <p>
+                        Trong {{ lo_roi_data.nhieu_nhay.count }} lần xảy ra ({{ lo_roi_data.nhieu_nhay.from }} → {{ lo_roi_data.nhieu_nhay.to }}), 
+                        trung bình {{ lo_roi_data.nhieu_nhay.avg_gap }} ngày mới có một lần lô rơi. 
+                        Lần gần nhất cách đây {{ lo_roi_data.nhieu_nhay.last_gap }} ngày. 
+                        → <b>Xác suất ngày mai ≈ {{ lo_roi_data.nhieu_nhay.xac_suat }}%</b>.
+                        </p>
+                        <details>
+                            <summary>Chi tiết các lần rơi</summary>
+                            <ul>
+                                {% for ct in lo_roi_data.nhieu_nhay.chi_tiet %}
+                                <li>{{ ct }}</li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+
+                        {% if lo_roi_data.ung_vien %}
+                        <!-- Ứng viên lô rơi -->
+                        <h4>Ứng viên lô rơi ngày mai:</h4>
+                        <ul>
+                            {% for uv in lo_roi_data.ung_vien %}
+                                <li>
+                                    Số <b>{{ uv.so }}</b>:
+                                    từng rơi {{ uv.so_roi }}/{{ uv.so_lan }} lần 
+                                    (≈ {{ uv.ty_le }}%)
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    
+                    {% elif action == 'lo_roi' %}
+                        <p style="text-align:center;font-style:italic;">Không có dữ liệu lô rơi.</p>
                     {% endif %}
                 </div>
             </section>
@@ -428,10 +494,10 @@
             const chamChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: {{ cham_data.cham.keys()|list|sort|safe }},
+                    labels: {{ cham_data.chart.labels|tojson }},
                     datasets: [{
                         label: 'Số lần xuất hiện',
-                        data: {{ cham_data.cham.values()|list|safe }},
+                        data: {{ cham_data.chart.data|tojson }},
                         backgroundColor: [
                             '#16a085', '#2980b9', '#8e44ad', '#e74c3c', '#f39c12',
                             '#d35400', '#c0392b', '#27ae60', '#2c3e50', '#7f8c8d'
@@ -477,7 +543,10 @@
                     datasets: [{
                         label: 'Tổng số lần',
                         data: {{ tong_data.values()|list }},
-                        backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                        backgroundColor: [
+                            '#16a085', '#2980b9', '#8e44ad', '#e74c3c', '#f39c12',
+                            '#d35400', '#c0392b', '#27ae60', '#2c3e50', '#7f8c8d'
+                        ],
                         borderColor: 'rgba(255, 159, 64, 1)',
                         borderWidth: 1
                     }]
@@ -503,104 +572,6 @@
             {% endfor %}
             {% endif %}
             
-            {% if lo_roi_data %}
-            const days = {{ lo_roi_data.ngay_labels | tojson }};
-            const datasets = [];
-
-            const colors = [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)',
-                'rgba(255, 159, 64, 1)',
-                'rgba(199, 199, 199, 1)',
-                'rgba(83, 102, 255, 1)',
-                'rgba(255, 102, 255, 1)',
-                'rgba(102, 255, 153, 1)'
-            ];
-
-            let colorIndex = 0;
-
-            {% for loai, data in [('Lô Thường', lo_roi_data.lo_thuong), ('Lô ĐB', lo_roi_data.lo_db)] %}
-                {% for cap_so, day_ranges in data.items() %}
-                    {
-                        let dataPoints = new Array(days.length).fill(null);
-
-                        {% for start_day, end_day in day_ranges %}
-                            days.forEach((d, idx) => {
-                                if (d >= '{{ start_day }}' && d <= '{{ end_day }}') {
-                                    dataPoints[idx] = parseInt('{{ cap_so }}');
-                                }
-                            });
-                        {% endfor %}
-
-                        datasets.push({
-                            label: '{{ cap_so }} ({{ loai }})',
-                            data: dataPoints,
-                            fill: false,
-                            borderColor: colors[colorIndex % colors.length],
-                            backgroundColor: colors[colorIndex % colors.length],
-                            tension: 0.3,
-                            pointRadius: 5,
-                            spanGaps: true
-                        });
-
-                        colorIndex++;
-                    }
-                {% endfor %}
-            {% endfor %}
-
-            new Chart(document.getElementById("chart_lo_roi").getContext("2d"), {
-                type: 'line',
-                data: {
-                    labels: days,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { 
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 12,
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: { 
-                                display: true, 
-                                text: 'Cặp số (Lô rơi)',
-                                font: {
-                                    size: 12
-                                }
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value % 1 === 0 ? value : null;
-                                }
-                            }
-                        },
-                        x: {
-                            title: { 
-                                display: true, 
-                                text: 'Ngày',
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            {% endif %}
         });
     </script>
 </body>

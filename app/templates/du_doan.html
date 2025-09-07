@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dự Đoán XSMB - Hệ Thống Phân Tích Thông Minh</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            color: #dc3545 !important;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: none;
+            border-radius: 10px;
+        }
+        .card-header {
+            background: linear-gradient(45deg, #dc3545, #fd7e14);
+            color: white;
+            font-weight: bold;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        .so-du-doan {
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 8px;
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+        }
+        .so-top-1 {
+            background: linear-gradient(45deg, #ffd700, #ffa500);
+            color: #000;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .so-top-2 {
+            background: linear-gradient(45deg, #c0c0c0, #a9a9a9);
+            color: #000;
+            transform: scale(1.05);
+        }
+        .so-top-3 {
+            background: linear-gradient(45deg, #cd7f32, #8c6b46);
+            color: #fff;
+        }
+        .so-binh-thuong {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+        }
+        .badge-cham {
+            font-size: 1rem;
+            padding: 0.5em 0.8em;
+            margin: 0.2em;
+        }
+        .progress {
+            height: 20px;
+            margin-bottom: 10px;
+        }
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(45deg, #dc3545, #fd7e14);
+            color: white;
+            border: none;
+            font-weight: bold;
+        }
+        .nav-tabs .nav-link {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        .thoi-gian-xu-ly {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .ket-qua-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .loading i {
+            font-size: 3rem;
+            color: #dc3545;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .accordion-button:not(.collapsed) {
+            background: linear-gradient(45deg, #dc3545, #fd7e14);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-chart-line me-2"></i>DỰ ĐOÁN XSMB
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-sliders-h me-2"></i>THIẾT LẬP DỰ ĐOÁN
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/du_doan">
+                            <div class="row">
+                                <div class="col-md-6">
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Số lượng dự đoán:</label>
+                                        <select class="form-select" name="so_du_doan">
+                                            <option value="5">Top 5</option>
+                                            <option value="10" selected>Top 10</option>
+                                            <option value="15">Top 15</option>
+                                            <option value="20">Top 20</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-calculator me-2"></i>THỰC HIỆN DỰ ĐOÁN
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if ket_qua_truyen_thong %}
+        <div class="ket-qua-section">
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="truyen-thong-tab" data-bs-toggle="tab" data-bs-target="#truyen-thong" type="button" role="tab">
+                        <i class="fas fa-brain me-2"></i>Dự đoán truyền thống
+                        {% if thoi_gian_xu_ly and thoi_gian_xu_ly.truyen_thong %}
+                        <span class="thoi-gian-xu-ly">({{ thoi_gian_xu_ly.truyen_thong }}s)</span>
+                        {% endif %}
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="myTabContent">
+                <!-- Tab Dự đoán truyền thống -->
+                <div class="tab-pane fade show active" id="truyen-thong" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <h4 class="mb-3">Kết quả dự đoán truyền thống</h4>
+                            
+                            <!-- Hiển thị phạm vi ngày phân tích -->
+                            {% if ket_qua_truyen_thong.phan_tich and ket_qua_truyen_thong.phan_tich.cham and ket_qua_truyen_thong.phan_tich.cham.date_range %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Phân tích dữ liệu từ: <strong>{{ ket_qua_truyen_thong.phan_tich.cham.date_range }}</strong>
+                            </div>
+                            {% endif %}
+                            
+                            {% if ket_qua_truyen_thong.du_doan %}
+                            <div class="row">
+                                {% for item in ket_qua_truyen_thong.du_doan %}
+                                <div class="col-md-2 col-sm-3 col-4 mb-3 text-center">
+                                    <div class="so-du-doan 
+                                        {% if loop.index == 1 %}so-top-1
+                                        {% elif loop.index == 2 %}so-top-2
+                                        {% elif loop.index == 3 %}so-top-3
+                                        {% else %}so-binh-thuong{% endif %}">
+                                        {{ item.so }}
+                                        <div class="mt-1" style="font-size: 0.8rem;">
+                                            {{ "%.2f"|format(item.diem) }} điểm
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <!-- Chi tiết lý do cho từng số -->
+                            <div class="accordion mt-4" id="accordionLyDo">
+                                {% for item in ket_qua_truyen_thong.du_doan %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#collapse{{ loop.index }}" 
+                                                aria-expanded="{{ 'true' if loop.first else 'false' }}" 
+                                                aria-controls="collapse{{ loop.index }}">
+                                            <strong>{{ item.so }}</strong> - {{ "%.2f"|format(item.diem) }} điểm 
+                                            <span class="badge bg-info ms-2">{{ item.so_ly_do }} lý do</span>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ loop.index }}" 
+                                        class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                                        aria-labelledby="heading{{ loop.index }}" 
+                                        data-bs-parent="#accordionLyDo">
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <h6>Lý do điểm cao:</h6>
+                                                    <ul class="list-group">
+                                                        {% for ly_do in item.ly_do %}
+                                                        <li class="list-group-item">
+                                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                                            {{ ly_do }}
+                                                        </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h6>Thống kê:</h6>
+                                                    <div class="stat-box">
+                                                        <div class="stat-number">{{ "%.2f"|format(item.diem) }}</div>
+                                                        <div class="stat-label">Tổng điểm</div>
+                                                    </div>
+                                                    <div class="stat-box">
+                                                        <div class="stat-number">{{ item.so_ly_do }}</div>
+                                                        <div class="stat-label">Số lý do</div>
+                                                    </div>
+                                                    <div class="stat-box">
+                                                        <div class="stat-number">{{ "%.2f"|format(item.diem / item.so_ly_do if item.so_ly_do > 0 else 0) }}</div>
+                                                        <div class="stat-label">Điểm trung bình/lý do</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-md-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ ket_qua_truyen_thong.thong_ke.tong_so }}</div>
+                                        <div class="stat-label">Tổng số được đánh giá</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ "%.2f"|format(ket_qua_truyen_thong.thong_ke.diem_cao_nhat) }}</div>
+                                        <div class="stat-label">Điểm cao nhất</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ "%.2f"|format(ket_qua_truyen_thong.thong_ke.diem_thap_nhat) }}</div>
+                                        <div class="stat-label">Điểm thấp nhất</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ "%.1f"|format(ket_qua_truyen_thong.thong_ke.trung_binh_ly_do) }}</div>
+                                        <div class="stat-label">Trung bình lý do/số</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Không có dữ liệu dự đoán từ phương pháp truyền thống
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center mt-5">
+            <div class="loading">
+                <i class="fas fa-search"></i>
+                <h4 class="mt-3">CHỜ DỮ LIỆU DỰ ĐOÁN</h4>
+                <p class="text-muted">Hãy chọn thiết lập và nhấn "Thực hiện dự đoán" để bắt đầu</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <p>Hệ thống dự đoán XSMB &copy; 2024 - Phát triển bởi AI Analysis Team</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Xử lý tab
+        document.addEventListener('DOMContentLoaded', function() {
+            const triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'));
+            triggerTabList.forEach(function(triggerEl) {
+                new bootstrap.Tab(triggerEl);
+            });
+        });
+    </script>
+</body>
+</html>

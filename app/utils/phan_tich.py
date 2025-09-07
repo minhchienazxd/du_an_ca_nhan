@@ -1,42 +1,65 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-def phan_tich_cham(collection):
-    # Lấy kết quả ngày mới nhất
-    latest_doc = sorted(
-        list(collection.find()),
-        key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"),
-        reverse=True
-    )[0]
-    if not latest_doc:
-        return {}
+def phan_tich_cham(collection, so_ngay=7):
+    data = get_last_days(collection, so_ngay)
+    valid_data = [d for d in data if d.get("ketqua")]
 
-    ketqua = latest_doc.get("ketqua", {})
-    tat_ca_so = []
+    if not valid_data:
+        return {
+            "cham_all": {},
+            "cham_db": {},
+            "cham": {},
+            "chart": {"labels": [], "data": []},
+            "date_range": "Không có dữ liệu"
+        }
 
-    # Duyệt toàn bộ các giải
-    for giai, value in ketqua.items():
-        if isinstance(value, list):
-            tat_ca_so.extend(value)
-        elif isinstance(value, str):
-            tat_ca_so.append(value)
+    valid_data.sort(key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"), reverse=True)
+    ngay_moi = valid_data[0]["date"]
+    ngay_cu = valid_data[-1]["date"]
+    date_range = f"{ngay_cu} → {ngay_moi}"
 
-    # Trích các chạm từ tất cả các số
-    tat_ca_cham = []
-    for so in tat_ca_so:
-        for digit in so:
-            if digit.isdigit():
-                tat_ca_cham.append(int(digit))
+    cham_all = {str(i): {"count": 0, "dates": []} for i in range(10)}
+    cham_db = {str(i): {"count": 0, "dates": []} for i in range(10)}
 
-    # Đếm số lần xuất hiện của từng chạm (0–9)
-    dem_cham = Counter(tat_ca_cham)
+    for d in valid_data:
+        date = d["date"]
+        kq = d["ketqua"]
 
-    # Đảm bảo đủ 0–9, nếu thiếu gán 0
-    full_cham = {i: dem_cham.get(i, 0) for i in range(10)}
+        # Toàn bộ giải
+        for g, v in kq.items():
+            vals = v if isinstance(v, list) else [v]
+            for so in vals:
+                if not so:  # bỏ qua rỗng
+                    continue
+                cap = so[-2:]
+                for digit in set(cap):
+                    if digit.isdigit():
+                        cham_all[digit]["count"] += 1
+                        cham_all[digit]["dates"].append(date)
+
+        # Giải ĐB
+        db = kq.get("ĐB")
+        if db:
+            db_val = db[0] if isinstance(db, list) else db
+            if db_val:
+                cap = db_val[-2:]
+                for digit in set(cap):
+                    if digit.isdigit():
+                        cham_db[digit]["count"] += 1
+                        cham_db[digit]["dates"].append(date)
+
+    cham_manh = {k: v for k, v in cham_db.items() if v["count"] >= 2}
 
     return {
-        "ngay": latest_doc["date"],
-        "cham": full_cham
+        "cham_all": cham_all,
+        "cham_db": cham_db,
+        "cham": cham_manh,
+        "chart": {
+            "labels": [str(i) for i in range(10)],
+            "data": [int(cham_all[str(i)]["count"]) for i in range(10)]
+        },
+        "date_range": date_range
     }
 
 def phan_tich_tong_lo(collection):
@@ -75,77 +98,167 @@ def phan_tich_tong_lo(collection):
 
     return ket_qua_theo_ngay
 
+from datetime import datetime
 
-def phan_tich_lo_roi(collection, so_ngay=7, max_khoang_cach=3):
+def phan_tich_lo_roi(collection, so_ngay=100):
     data = get_last_days(collection, so_ngay)
-    data.reverse()  # đảo lại theo ngày tăng dần (từ cũ → mới)
+    data.sort(key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"))
 
+    roi_db_days = []      
+    roi_nhieu_days = []   
+    chi_tiet_db = []
+    chi_tiet_nhieu = []
 
-    lo_map = defaultdict(list)
-    db_map = defaultdict(list)
-    all_days = []
+    prev_db = None
+    prev_counts = None
+    prev_date = None
 
-    for doc in data:
-        ngay = doc["date"]
-        all_days.append(ngay)
-        ketqua = doc["ketqua"]
+    history_counts = [] 
+    for d in data:
+        ngay = d["date"]
+        kq = d.get("ketqua")
+        
+        # Bỏ qua ngày không có kết quả hoặc kết quả rỗng
+        if not kq or not has_valid_ketqua(d):
+            continue
 
-        lo_thuong = []
-        lo_db = []
+        # --- lấy giải đặc biệt ---
+        db_val = kq.get("ĐB")
+        
+        # Kiểm tra và xử lý giá trị giải đặc biệt
+        if db_val is None:
+            continue
+            
+        # Xử lý trường hợp db_val là list rỗng
+        if isinstance(db_val, list):
+            if len(db_val) == 0:
+                continue
+            db_val = db_val[0]
+        
+        # Kiểm tra độ dài của db_val
+        if not db_val or len(db_val) < 2:
+            continue
+            
+        db = db_val[-2:]
 
-        for giai, values in ketqua.items():
-            if not isinstance(values, list):
-                values = [values]
-            for v in values:
-                cap_so = v[-2:]
-                if giai == "ĐB":
-                    lo_db.append(cap_so)
-                else:
-                    lo_thuong.append(cap_so)
+        # --- đếm tần suất tất cả lô trong ngày ---
+        counts = {}
+        for g, v in kq.items():
+            if not v:  # Bỏ qua giá trị rỗng
+                continue
+                
+            vals = v if isinstance(v, list) else [v]
+            for so in vals:
+                if not so or len(so) < 2:  # Bỏ qua số không hợp lệ
+                    continue
+                cap = so[-2:]
+                counts[cap] = counts.get(cap, 0) + 1
 
-        for cap in set(lo_thuong):
-            lo_map[cap].append(ngay)
-        for cap in set(lo_db):
-            db_map[cap].append(ngay)
+        # --- check lô rơi từ ĐB ---
+        if prev_db and db == prev_db:
+            roi_db_days.append(ngay)
+            chi_tiet_db.append(f"Số {db} rơi từ ĐB {prev_date} → {ngay}")
 
-    def tim_lo_roi(map_data):
-        lo_roi = {}
-        for cap, ngay_list in map_data.items():
-            dates = sorted([datetime.strptime(d, "%d-%m-%Y") for d in ngay_list])
-            if len(dates) < 2:
+        # --- check lô rơi từ nhiều nháy ---
+        if prev_counts:
+            for num, cnt in prev_counts.items():
+                if cnt >= 2 and counts.get(num, 0) > 0:
+                    roi_nhieu_days.append(ngay)
+                    chi_tiet_nhieu.append(f"Số {num} (về {cnt} nháy) ngày {prev_date} → rơi lại {ngay}")
+
+        prev_db = db
+        prev_counts = counts
+        prev_date = ngay
+        history_counts.append((ngay, counts))
+    
+    # === tính toán thống kê ===
+    def tinh_xac_suat(days, chi_tiet):
+        if len(days) < 2:
+            return {
+                "count": len(days),
+                "avg_gap": None,
+                "last_gap": None,
+                "xac_suat": 0,
+                "from": data[0]["date"] if data else "N/A",
+                "to": data[-1]["date"] if data else "N/A",
+                "chi_tiet": chi_tiet
+            }
+
+        gaps = []
+        for i in range(1, len(days)):
+            try:
+                d1 = datetime.strptime(days[i-1], "%d-%m-%Y")
+                d2 = datetime.strptime(days[i], "%d-%m-%Y")
+                gaps.append((d2 - d1).days)
+            except:
                 continue
 
-            bat_dau = dates[0]
-            truoc_do = dates[0]
-            count = 1
+        if not gaps:
+            return {
+                "count": len(days),
+                "avg_gap": None,
+                "last_gap": None,
+                "xac_suat": 0,
+                "from": data[0]["date"] if data else "N/A",
+                "to": data[-1]["date"] if data else "N/A",
+                "chi_tiet": chi_tiet
+            }
 
-            for i in range(1, len(dates)):
-                chenh_lech = (dates[i] - truoc_do).days
-                if 1 <= chenh_lech <= max_khoang_cach:
-                    truoc_do = dates[i]
-                    count += 1
-                else:
-                    if count >= 2:
-                        lo_roi.setdefault(cap, []).append((
-                            bat_dau.strftime("%d-%m-%Y"),
-                            truoc_do.strftime("%d-%m-%Y")
-                        ))
-                    bat_dau = truoc_do = dates[i]
-                    count = 1
+        avg_gap = sum(gaps) / len(gaps)
 
-            if count >= 2:
-                lo_roi.setdefault(cap, []).append((
-                    bat_dau.strftime("%d-%m-%Y"),
-                    truoc_do.strftime("%d-%m-%Y")
-                ))
+        try:
+            last_day = datetime.strptime(days[-1], "%d-%m-%Y")
+            today = datetime.strptime(data[-1]["date"], "%d-%m-%Y") if data else datetime.now()
+            last_gap = (today - last_day).days
+        except:
+            last_gap = 0
 
-        return lo_roi
+        # xác suất
+        if last_gap >= avg_gap:
+            xac_suat = 100
+        else:
+            xac_suat = round(last_gap / avg_gap * 100, 2) if avg_gap > 0 else 0
+
+        return {
+            "count": len(days),
+            "avg_gap": round(avg_gap, 2),
+            "last_gap": last_gap,
+            "xac_suat": xac_suat,
+            "from": data[0]["date"] if data else "N/A",
+            "to": data[-1]["date"] if data else "N/A",
+            "chi_tiet": chi_tiet
+        }
+    
+    # === phân tích ứng viên từ nhiều nháy ngày cuối ===
+    ung_vien = []
+    if history_counts:
+        last_date, last_counts = history_counts[-1]
+        # chọn số có >= 2 nháy
+        candidates = [num for num, cnt in last_counts.items() if cnt >= 2]
+        for num in candidates:
+            tong = 0
+            roi = 0
+            for i in range(len(history_counts)-1):
+                counts_today = history_counts[i][1]
+                counts_next = history_counts[i+1][1]
+                if counts_today.get(num, 0) >= 2:
+                    tong += 1
+                    if counts_next.get(num, 0) > 0:
+                        roi += 1
+            ty_le = round(roi/tong*100, 2) if tong > 0 else 0
+            ung_vien.append({
+                "so": num,
+                "so_lan": tong,
+                "so_roi": roi,
+                "ty_le": ty_le
+            })
 
     return {
-        "lo_thuong": tim_lo_roi(lo_map),
-        "lo_db": tim_lo_roi(db_map),
-        "ngay_labels": all_days
+        "db": tinh_xac_suat(roi_db_days, chi_tiet_db),
+        "nhieu_nhay": tinh_xac_suat(roi_nhieu_days, chi_tiet_nhieu),
+        "ung_vien": ung_vien
     }
+
 
 def get_last_days(collection, so_ngay=7):
     # Lấy toàn bộ dữ liệu
