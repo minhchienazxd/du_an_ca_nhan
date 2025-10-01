@@ -153,7 +153,7 @@
       <div class="wrapper">
         <div class="bang-container">
           <table class="bang-kq">
-            <tr><th>Giải</th><th>Kết quả</th></tr>
+            <tr><th>Giải</th><th class="cot-ketqua">XSMB - Kết quả xổ số miền Bắc - SXMB</th></tr>
             {% for giai, ds in result.ketqua.items() %}
             <tr class="{% if giai == 'ĐB' %}giai-db{% elif giai == 'G7' %}giai-g7{% endif %}">
               <td class="giai">{{ giai }}</td>
@@ -195,7 +195,7 @@
       <div class="wrapper">
         <div class="bang-container">
           <table class="bang-kq">
-            <tr><th>Giải</th><th>Kết quả</th></tr>
+            <tr><th>Giải</th><th class="cot-ketqu">XSMB - Kết quả xổ số miền Bắc - SXMB</th></tr>
             {% for giai, ds in item.ketqua.items() %}
             <tr class="{% if giai == 'ĐB' %}giai-db{% elif giai == 'G7' %}giai-g7{% endif %}">
               <td class="giai">{{ giai }}</td>
@@ -378,6 +378,13 @@
     </aside>
     {% endif %}
   </div>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <p>Hệ thống dự đoán XSMB &copy; 2024 - Phát triển bởi AI Analysis Team</p>
+        </div>
+    </footer>
 
 <script>
 // ===== QUẢN LÝ TAB =====
@@ -421,6 +428,28 @@ function showMessages(){
 const socket = io();
 const currentUserId = "{{ user._id|string }}";
 socket.on("connect", () => console.log("Socket connected!"));
+// Khi server emit sự kiện new_result
+socket.on("new_result", (data) => {
+  console.log("📩 Nhận kết quả mới:", data);
+
+  // ví dụ cập nhật thẻ hiển thị kết quả
+  const resultsDiv = document.getElementById("realtime-results");
+
+  if (resultsDiv) {
+    resultsDiv.innerHTML = `
+      <h3>Kết quả XSMB ngày ${data.date}</h3>
+      <p><strong>ĐB:</strong> ${data.ketqua["ĐB"].join(", ")}</p>
+      <p><strong>G1:</strong> ${data.ketqua["G1"].join(", ")}</p>
+      <p><strong>G2:</strong> ${data.ketqua["G2"].join(", ")}</p>
+      <p><strong>G3:</strong> ${data.ketqua["G3"].join(", ")}</p>
+      <p><strong>G4:</strong> ${data.ketqua["G4"].join(", ")}</p>
+      <p><strong>G5:</strong> ${data.ketqua["G5"].join(", ")}</p>
+      <p><strong>G6:</strong> ${data.ketqua["G6"].join(", ")}</p>
+      <p><strong>G7:</strong> ${data.ketqua["G7"].join(", ")}</p>
+    `;
+  }
+});
+
 socket.on("connect_error", err => console.log("Socket connection error:", err));
 let currentChatPeer = null;
 let typingTimeout = null;
@@ -444,12 +473,31 @@ function showNotifications(){
     pendingNotifications.forEach(notification => {
       addNotificationToUI(notification, true);
     });
-    pendingNotifications = []; // Xóa các thông báo đã xử lý
+    pendingNotifications = [];
   }
   
   updateNotificationBadge();
 }
-
+// =====================
+// Sắp xếp thông báo theo thời gian (mới nhất lên đầu)
+// =====================
+function sortNotificationsByTime() {
+  const notificationsList = document.getElementById("notifications-list");
+  if (!notificationsList) return;
+  
+  const notifications = Array.from(notificationsList.children);
+  
+  notifications.sort((a, b) => {
+    const timeA = a.querySelector('.notification-time').textContent;
+    const timeB = b.querySelector('.notification-time').textContent;
+    return new Date(timeB) - new Date(timeA);
+  });
+  
+  // Xóa và thêm lại theo thứ tự mới
+  notifications.forEach(notification => {
+    notificationsList.appendChild(notification);
+  });
+}
 // =====================
 // Hàm thêm thông báo vào UI
 // =====================
@@ -507,11 +555,15 @@ function addNotificationToUI(notification, isNew = false) {
     </div>
   `;
   
-  // Thêm vào đầu danh sách
-  notificationsList.prepend(notificationEl);
+  // LUÔN THÊM VÀO ĐẦU DANH SÁCH (mới nhất lên đầu)
+  if (notificationsList.firstChild) {
+    notificationsList.insertBefore(notificationEl, notificationsList.firstChild);
+  } else {
+    notificationsList.appendChild(notificationEl);
+  }
+  // Cập nhật badge sau khi thêm thông báo
+  updateNotificationBadge();
 }
-
-
 // =====================
 // Xử lý click thông báo
 // =====================
@@ -570,7 +622,7 @@ function updateNotificationBadge() {
   const unseenElements = document.querySelectorAll('.notification.unseen');
   const unseenCount = unseenElements.length + pendingNotifications.length;
   const badge = document.getElementById("notification-badge");
-  
+  console.log(`Cập nhật badge: ${unseenCount} thông báo chưa đọc`);
   if (unseenCount > 0) {
     badge.style.display = "inline";
     badge.textContent = unseenCount > 99 ? "99+" : unseenCount;
@@ -608,9 +660,6 @@ socket.on("new_notification", notification => {
     return;
   }
   
-  // Cập nhật badge
-  updateNotificationBadge();
-  
   // Kiểm tra xem đang ở tab thông báo hay không
   const isNotificationTab = document.getElementById('notifications-container').style.display === 'block';
   
@@ -623,6 +672,8 @@ socket.on("new_notification", notification => {
     
     // Hiển thị toast notification
     showToastNotification(notification);
+    // Cập nhật badge lại để bao gồm pending
+    updateNotificationBadge();
   }
 });
 // =====================
@@ -735,19 +786,19 @@ function likePost(postId, button) {
     button.classList.add("liked");
     button.setAttribute("data-liked", "true");
     button.textContent = 'Like (' + (currentLikes + 1) + ')';
+    // Gửi thông báo - lấy user_id của chủ bài viết
+    const postElement = document.querySelector('.post[data-id="' + postId + '"]');
+    const postOwnerId = postElement ? postElement.getAttribute('data-owner-id') : null;
+
+    if (postOwnerId && postOwnerId !== currentUserId) {
+        sendNotification("like", postOwnerId, postId);
+    }
   }
-  
   // Gửi sự kiện đến server
   socket.emit("like_post", { post_id: postId, user_id: currentUserId });
-  
-  // Gửi thông báo - lấy user_id của chủ bài viết
-  const postElement = document.querySelector('.post[data-id="' + postId + '"]');
-  const postOwnerId = postElement ? postElement.getAttribute('data-owner-id') : null;
-  
-  if (postOwnerId && postOwnerId !== currentUserId) {
-    sendNotification("like", postOwnerId, postId);
-  }
 }
+
+
 
 
 socket.on("update_like", data => {
@@ -885,25 +936,64 @@ function addFriendRequest(userId, userName) {
 // =====================
 // CHẤP NHẬN KẾT BẠN
 // =====================
-function acceptFriend(userId) {
+function acceptFriend(userId, event) {
+  event.stopPropagation();
+  // Kiểm tra xem đã có trong danh sách bạn bè chưa
+  const existingFriend = document.querySelector(`#friend-list div[data-id='${userId}']`);
+  if (existingFriend) {
+      alert("Người này đã là bạn bè của bạn");
+      // Xóa thông báo kết bạn
+      const requestDiv = document.getElementById(`req-${userId}`);
+      if (requestDiv) {
+          requestDiv.remove();
+      }
+      return;
+  }
+  
   socket.emit("accept_friend", { from_user_id: userId });
 }
 
 // Xử lý khi kết bạn thành công
 socket.on("friend_added", data => {
+  console.log("Thêm bạn thành công:", data);
   // Xóa khỏi danh sách lời mời
   const requestDiv = document.getElementById(`req-${data.friend_id}`);
   if (requestDiv) {
     requestDiv.remove();
   }
   
-  // Thêm vào danh sách bạn bè
-  addFriendToList(data.friend_id, data.friend_name, data.friend_picture);
-
-  // Gửi thông báo chấp nhận kết bạn
-  sendNotification("friend_accept", data.friend_id);
+  // Kiểm tra xem đã có trong danh sách bạn bè chưa trước khi thêm
+  const existingFriend = document.querySelector(`#friend-list div[data-id='${data.friend_id}']`);
+  if (!existingFriend) {
+      // Thêm vào danh sách bạn bè
+      addFriendToList(data.friend_id, data.friend_name, data.friend_picture);
+  }
+  // Cập nhật badge thông báo
+  updateNotificationBadge();
 });
-
+// Xử lý lỗi kết bạn
+socket.on("error", data => {
+    console.log("Lỗi kết bạn:", data);
+    
+    if (data.error === "ALREADY_FRIENDS") {
+        alert("Người này đã là bạn bè của bạn");
+        // Xóa thông báo kết bạn
+        const requestDiv = document.getElementById(`req-${data.from_user_id}`);
+        if (requestDiv) {
+            requestDiv.remove();
+        }
+        updateNotificationBadge();
+    } else if (data.error === "NO_FRIEND_REQUEST") {
+        alert("Không tìm thấy lời mời kết bạn");
+        const requestDiv = document.getElementById(`req-${data.from_user_id}`);
+        if (requestDiv) {
+            requestDiv.remove();
+        }
+        updateNotificationBadge();
+    } else if (data.error === "ALREADY_REQUESTED") {
+        alert("Đã gửi lời mời kết bạn trước đó");
+    }
+});
 // =====================
 // THÊM BẠN VÀO DANH SÁCH
 // =====================
@@ -1409,6 +1499,7 @@ function loadNotifications() {
     .then(response => response.json())
     .then(notifications => {
       const notificationsList = document.getElementById("notifications-list");
+      notifications.sort((a, b) => new Date(b.time) - new Date(a.time));
       if (notifications.length === 0) {
         notificationsList.innerHTML = '<div class="notification">Chưa có thông báo nào</div>';
       } else {

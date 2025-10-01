@@ -416,7 +416,7 @@ def phan_tich_cau_ngang(collection, so_ngay=7):
                 final_caus.append({
                     "source": cau_info['source'],
                     "final": cau_info['last_cap'],
-                    "final_reverse": cau_info['last_cap'][1] + cau_info['last_cap'][0],
+                    
                     "history": cau_info['history'],
                     "so_ngay": cau_info['so_ngay']
                 })
@@ -497,7 +497,7 @@ def phan_tich_cau_cheo(collection, so_ngay=7):
 
         cau_results = []
         cau_theo_cap_so = defaultdict(list)
-
+        seen = set()
         # Chuẩn bị dữ liệu 2 số cuối - CHỈ lấy ngày có dữ liệu
         last_two_digits_per_day = []
         valid_dates = []
@@ -602,14 +602,29 @@ def phan_tich_cau_cheo(collection, so_ngay=7):
                                     
                                     # Nếu cầu sống đến ngày cuối
                                     if cau["alive"] and len(cau["days"]) >= 2:
-                                        final_result = {
-                                            "final": cau['pairs'][-1],
-                                            "final_reverse": cau['pairs'][-1][1] + cau['pairs'][-1][0],
-                                            "history": list(zip(cau['days'], cau['pairs'])),
-                                            "source": cau['source']
-                                        }
-                                        cau_theo_cap_so[final_result['final']].append(final_result)
-                                        cau_results.append(final_result)
+                                        final_cap = cau['pairs'][-1]
+
+                                        # Key chỉ dựa vào nguồn + số cuối
+                                        key = (final_cap, cau['source'])
+
+                                        if key not in seen:
+                                            seen.add(key)
+                                            final_result = {
+                                                "final": final_cap,
+                                                
+                                                "history": list(zip(cau['days'], cau['pairs'])),
+                                                "source": cau['source']
+                                            }
+                                            cau_theo_cap_so[final_cap].append(final_result)
+                                            cau_results.append(final_result)
+                                        else:
+                                            # Nếu đã có rồi thì chỉ cần nối thêm lịch sử
+                                            for cau_item in cau_theo_cap_so[final_cap]:
+                                                if cau_item["source"] == cau["source"]:
+                                                    for d, p in zip(cau['days'], cau['pairs']):
+                                                        if (d, p) not in cau_item["history"]:
+                                                            cau_item["history"].append((d, p))
+                                                    break
 
         return dict(cau_theo_cap_so)
         

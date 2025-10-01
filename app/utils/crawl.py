@@ -1,9 +1,11 @@
 import requests
+import time
 from datetime import datetime, timedelta, date
 from models.database import get_db, init_db
 from bs4 import BeautifulSoup
 from cloudscraper import create_scraper
 from collections import Counter, defaultdict
+
 
 # Hàm định dạng ngày để LƯU vào database (dạng 31-7-2025)
 def format_date_for_db(d: date) -> str:
@@ -16,6 +18,7 @@ def format_date_for_display(date_str: str) -> str:
 
 # Lấy dữ liệu từ web và lưu vào MongoDB
 def fetch_and_save_data(selected_date: date = None):
+    from app import socketio
     if isinstance(selected_date, str):
         selected_date = datetime.strptime(selected_date, "%d-%m-%Y").date()
     if not selected_date:
@@ -58,7 +61,7 @@ def fetch_and_save_data(selected_date: date = None):
         upsert=True
     )
     print(f"✅ Đã lưu/cập nhật kết quả XSMB ngày {format_date_for_display(result['date'])} vào MongoDB.")
-
+    socketio.emit("new_result", result)
 # Lấy kết quả hôm nay từ DB
 def get_today_result():
     today = date.today()
@@ -114,7 +117,17 @@ def get_past_5_results_with_stats(get_result_by_date_func, thong_ke_func, exclud
             })
         i += 1
     return results
-
+def auto_update(interval: int = 30):
+    """Tự động crawl và lưu DB mỗi interval giây (mặc định 30s)."""
+    while True:
+        try:
+            now = datetime.now()
+            # Chỉ crawl trong khung giờ SXMB quay (18h10 – 18h45)
+            if 18 <= now.hour <= 18 and 10 <= now.minute <= 45:
+                fetch_and_save_data()
+        except Exception as e:
+            print("❌ Lỗi auto update:", e)
+        time.sleep(interval)
 # Test chạy trực tiếp file
 if __name__ == "__main__":
     init_db()

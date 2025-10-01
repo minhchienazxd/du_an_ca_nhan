@@ -3,13 +3,21 @@ from flask_socketio import emit
 from datetime import datetime
 from bson import ObjectId
 from app.utils.crawl import get_db  # function để lấy db MongoDB
-
+from flask_socketio import join_room, leave_room
 
 def register_feed_events(socketio):
     @socketio.on("connect")
     def on_connect():
         emit("connected", {"ok": True})
     # ================= NOTIFICATION =================
+    @socketio.on("join_user_room")
+    def on_join_user_room(data):
+        """User join room của chính mình để nhận thông báo"""
+        user_id = data.get("user_id")
+        if user_id:
+            join_room(str(user_id))
+            print(f"User {user_id} joined notification room")
+
     @socketio.on("send_notification")
     def on_send_notification(data):
         """
@@ -162,6 +170,18 @@ def register_feed_events(socketio):
                 return_document=True
             )
             liked = True
+        if liked and post["user_id"] != user_id:
+            from_user = db.users.find_one({"_id": ObjectId(user_id)})
+            if from_user:
+                # Gửi thông báo đến chủ bài viết
+                socketio.emit("send_notification", {
+                    "type": "like",
+                    "post_id": post_id,
+                    "to_user_id": post["user_id"],  # chủ bài viết
+                    "from_user_id": user_id,        # người like
+                    "from_user_name": from_user.get("name", "Unknown"),
+                    "from_user_picture": from_user.get("picture", "")
+                })
 
         if result:
             emit("update_like", {
@@ -215,7 +235,17 @@ def register_feed_events(socketio):
 
         comment["time"] = comment["time"].strftime("%d-%m-%Y %H:%M:%S")
         emit("new_comment", {"post_id": post_id, "comment": comment}, broadcast=True)
-    
+        # GỬI THÔNG BÁO COMMENT - CHỈ KHI KHÔNG PHẢI CHỦ POST
+        if result["user_id"] != user_id:
+            socketio.emit("send_notification", {
+                "type": "comment",
+                "post_id": post_id,
+                "content": content,
+                "to_user_id": result["user_id"],  # chủ bài viết
+                "from_user_id": user_id,          # người comment
+                "from_user_name": user_name,
+                "from_user_picture": user_picture
+            })
     @socketio.on("like_comment")
     def on_like_comment(data):
         """

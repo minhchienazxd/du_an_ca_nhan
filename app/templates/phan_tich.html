@@ -226,7 +226,7 @@
                         <div class="cell">
                             <div class="final-number">
                                 <strong>{{ cau.final }}</strong>
-                                <span style="font-size: 0.8em; color: #777;">/{{ cau.final_reverse }}</span>
+                                <span style="font-size: 0.8em; color: #777;">/{{ cau.final }}</span>
                                 <br>
                                 <span style="font-size: 0.7em;">({{ cau.so_ngay }} ngày)</span>
                             </div>
@@ -284,7 +284,7 @@
                             <a href="{{ url_for('thong_ke.chi_tiet_cau_cheo', cap_so=cap_so) }}" 
                             class="so-cau" 
                             style="display: block; text-decoration: none; color: inherit;">
-                                <div class="so-chinh">{{ cap_so }}/{{ cap_so[1] + cap_so[0] }}</div>
+                                <div class="so-chinh">{{ cap_so }}</div>
                                 <div class="so-luong">{{ cau_list|length }} cầu</div>
                             </a>
                         </div>

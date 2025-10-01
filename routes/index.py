@@ -138,6 +138,7 @@ def get_notifications():
     # Chuyển đổi ObjectId thành string
     for notification in notifications:
         notification["_id"] = str(notification["_id"])
-        notification["time"] = notification["time"].strftime("%d-%m-%Y %H:%M:%S")
+        if isinstance(notification.get("time"), datetime):
+            notification["time"] = notification["time"].strftime("%d-%m-%Y %H:%M:%S")
     
     return jsonify(notifications)

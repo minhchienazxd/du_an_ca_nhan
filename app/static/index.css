@@ -63,6 +63,25 @@ table.bang-kq {
 .bang-kq tr {
   height: 50px;
 }
+.cot-ketqua {
+  font-size: 20px;   /* chỉnh to nhỏ */
+  font-weight: bold; /* đậm chữ */   /* màu chữ */
+  text-align: center;/* căn giữa */
+  animation: blink 1.5s infinite;
+}
+@keyframes blink {
+   0%   { color: red; opacity: 1; }
+  25%  { color: orange; opacity: 0.7; }
+  50%  { color: yellow; opacity: 0.4; }
+  75%  { color: lime; opacity: 0.7; }
+  100% { color: red; opacity: 1; }
+}
+.cot-ketqu {
+  font-size: 20px;   /* chỉnh to nhỏ */
+  font-weight: bold; /* đậm chữ */   /* màu chữ */
+  text-align: center;
+  color: #333;/* căn giữa */
+}
 
 .so-container {
   display: grid;
@@ -462,6 +481,30 @@ main {
 .notification { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; }
 .notification:hover { background-color: #f0f0f0; }
 .notification.unseen { font-weight: bold; }
+/* Thêm vào phần style trong head */
+#notification-badge {
+    background-color: #ff4444 !important;
+    color: white !important;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    border: 2px solid white;
+}
+
+.menu-item {
+    position: relative;
+    display: inline-block;
+}
+
 
     /* Reply comment */
 .reply-form { margin-top: 5px; display: none; }
@@ -506,6 +549,7 @@ main {
 /* =========================================================
    💬 CHAT BOX
    ========================================================= */
+
 /* Chat box container */
 #chat-box {
   display: flex;

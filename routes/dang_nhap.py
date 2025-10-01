@@ -23,7 +23,7 @@ def show_login_page():
         identifier = request.form.get("phone")  # dùng cho cả phone/email
         password = request.form.get("password")
 
-        user = current_app.db["user"].find_one({"phone": identifier, "password": password})
+        user = current_app.db["users"].find_one({"phone": identifier, "password": password})
         if user:
             session["user"] = {
                 "name": user.get("name"),

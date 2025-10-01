@@ -64,6 +64,13 @@ def register_friend_events(socketio):
         emit("connected", {"ok": True})
 
     # ============== FRIENDS ==============
+    @socketio.on("join_user_room")
+    def on_join_user_room(data):
+        """User join room của chính mình để nhận thông báo"""
+        user_id = data.get("user_id")
+        if user_id:
+            join_room(str(user_id))
+            print(f"User {user_id} joined notification room")
 
     @socketio.on("get_friends")
     def on_get_friends():
@@ -122,7 +129,23 @@ def register_friend_events(socketio):
             "to_user_id": to_id,
             "to_user_name": to_user.get("name", to_user.get("username", "Unknown"))
         }, broadcast=True)
-
+         # GỬI THÔNG BÁO KẾT BẠN ĐẾN NGƯỜI NHẬN
+        notification_data = {
+            "type": "friend_request",
+            "to_user_id": to_id,
+            "from_user_id": me,
+            "from_user_name": from_user.get("name", "Unknown"),
+            "from_user_picture": from_user.get("picture", ""),
+            "time": datetime.utcnow().strftime("%d-%m-%Y %H:%M:%S"),
+            "seen": False
+        }
+        
+        # Lưu vào database
+        notification_id = db.notifications.insert_one(notification_data).inserted_id
+        
+        # Gửi realtime
+        notification_data["_id"] = str(notification_id)
+        emit("new_notification", notification_data, room=str(to_id))
     @socketio.on("get_friend_requests")
     def on_get_friend_requests():
         db, me = _require_user()
@@ -151,13 +174,25 @@ def register_friend_events(socketio):
             
             from_id = str(data.get("from_user_id"))
             if not from_id:
-                return
-            
+                return emit("error", {"error": "MISSING_USER_ID"})
+            # KIỂM TRA QUAN TRỌNG: Có lời mời kết bạn không
+            friend_request = db.friend_requests.find_one({
+                "from_user_id": from_id, 
+                "to_user_id": me
+            })
+            if not friend_request:
+                return emit("error", {"error": "NO_FRIEND_REQUEST"})
+            # KIỂM TRA QUAN TRỌNG: Đã là bạn bè chưa
+            if is_friend(db, me, from_id):
+                # Xóa lời mời nếu đã là bạn
+                db.friend_requests.delete_one({"from_user_id": from_id, "to_user_id": me})
+                return emit("error", {"error": "ALREADY_FRIENDS"})
             # Lấy thông tin người gửi
             from_user = db.users.find_one({"_id": ObjectId(from_id)})
             if not from_user:
                 return emit("error", {"error": "USER_NOT_FOUND"})
-            
+            # Lấy thông tin người chấp nhận
+            current_user = db.users.find_one({"_id": ObjectId(me)})
             # Thêm bạn hai chiều
             db.friends.insert_one({"user_id": me, "friend_id": from_id})
             db.friends.insert_one({"user_id": from_id, "friend_id": me})
@@ -165,13 +200,33 @@ def register_friend_events(socketio):
             # Xóa yêu cầu
             db.friend_requests.delete_one({"from_user_id": from_id, "to_user_id": me})
             
-            # Trả về thông tin đầy đủ
+             # QUAN TRỌNG: Chỉ gửi cho người chấp nhận (KHÔNG broadcast)
             emit("friend_added", {
                 "friend_id": from_id,
                 "friend_name": from_user.get("name", from_user.get("username", "Unknown")),
                 "friend_picture": from_user.get("picture", "")
-            }, broadcast=True)
+            })
+            
+            # Gửi cho người gửi lời mời để cập nhật danh sách bạn bè của họ
+            emit("friend_added", {
+                "friend_id": me,
+                "friend_name": current_user.get("name", current_user.get("username", "Unknown")),
+                "friend_picture": current_user.get("picture", "")
+            }, room=str(from_id))
+            
+            # Gửi thông báo chấp nhận kết bạn
+            socketio.emit("send_notification", {
+                "type": "friend_accept",
+                "to_user_id": from_id,
+                "from_user_id": me,
+                "from_user_name": current_user.get("name", "Unknown"),
+                "from_user_picture": current_user.get("picture", "")
+            })
+            
+            print(f"Kết bạn thành công: {me} <-> {from_id}")
+            
         except Exception as e:
+            print(f"Lỗi accept_friend: {e}")
             emit("error", {"error": "INTERNAL_ERROR", "message": str(e)})
     @socketio.on("reject_friend")
     def reject_friend(data):

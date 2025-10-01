@@ -136,6 +136,14 @@
                         <form method="POST" action="/du_doan">
                             <div class="row">
                                 <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Chọn kiểu dự đoán:</label>
+                                        <select class="form-select" name="kieu_du_doan">
+                                            <option value="truyen_thong" selected>Truyền thống</option>
+                                            <option value="machine_learning">Machine Learning</option>
+                                            <option value="tat_ca">Cả hai</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -158,9 +166,10 @@
             </div>
         </div>
 
-        {% if ket_qua_truyen_thong %}
+        {% if ket_qua_truyen_thong or ket_qua_machine_learning %}
         <div class="ket-qua-section">
             <ul class="nav nav-tabs" id="myTab" role="tablist">
+                {% if ket_qua_truyen_thong %}
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="truyen-thong-tab" data-bs-toggle="tab" data-bs-target="#truyen-thong" type="button" role="tab">
                         <i class="fas fa-brain me-2"></i>Dự đoán truyền thống
@@ -169,10 +178,22 @@
                         {% endif %}
                     </button>
                 </li>
+                {% endif %}
+                {% if ket_qua_machine_learning %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if not ket_qua_truyen_thong %}active{% endif %}" id="ml-tab" data-bs-toggle="tab" data-bs-target="#ml" type="button" role="tab">
+                        <i class="fas fa-robot me-2"></i>Dự đoán Machine Learning
+                        {% if thoi_gian_xu_ly and thoi_gian_xu_ly.machine_learning %}
+                        <span class="thoi-gian-xu-ly">({{ thoi_gian_xu_ly.machine_learning }}s)</span>
+                        {% endif %}
+                    </button>
+                </li>
+                {% endif %}
             </ul>
 
             <div class="tab-content" id="myTabContent">
                 <!-- Tab Dự đoán truyền thống -->
+                {% if ket_qua_truyen_thong %}
                 <div class="tab-pane fade show active" id="truyen-thong" role="tabpanel">
                     <div class="row mt-4">
                         <div class="col-md-12">
@@ -203,6 +224,7 @@
                                 </div>
                                 {% endfor %}
                             </div>
+
                             
                             <!-- Chi tiết lý do cho từng số -->
                             <div class="accordion mt-4" id="accordionLyDo">
@@ -292,6 +314,32 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
+
+                <!-- Tab Dự đoán Machine Learning -->
+                {% if ket_qua_machine_learning %}
+                <div class="tab-pane fade {% if not ket_qua_truyen_thong %}show active{% endif %}" id="ml" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <h4 class="mb-3">Kết quả dự đoán Machine Learning</h4>
+                            {% if ket_qua_machine_learning.du_doan %}
+                            <div class="row">
+                                {% for item in ket_qua_machine_learning.du_doan %}
+                                <div class="col-md-2 col-sm-3 col-4 mb-3 text-center">
+                                    <div class="so-du-doan {% if loop.index == 1 %}so-top-1{% elif loop.index == 2 %}so-top-2{% elif loop.index == 3 %}so-top-3{% else %}so-binh-thuong{% endif %}">
+                                        {{ item.so }}
+                                        <div class="mt-1" style="font-size: 0.8rem;">{{ "%.2f"|format(item.xac_suat) }} xác suất</div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Không có dữ liệu dự đoán từ Machine Learning</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% else %}
