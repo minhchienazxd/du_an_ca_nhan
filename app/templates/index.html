@@ -429,26 +429,292 @@ const socket = io();
 const currentUserId = "{{ user._id|string }}";
 socket.on("connect", () => console.log("Socket connected!"));
 // Khi server emit sự kiện new_result
+// Khi server emit sự kiện new_result
 socket.on("new_result", (data) => {
   console.log("📩 Nhận kết quả mới:", data);
-
-  // ví dụ cập nhật thẻ hiển thị kết quả
-  const resultsDiv = document.getElementById("realtime-results");
-
-  if (resultsDiv) {
-    resultsDiv.innerHTML = `
-      <h3>Kết quả XSMB ngày ${data.date}</h3>
-      <p><strong>ĐB:</strong> ${data.ketqua["ĐB"].join(", ")}</p>
-      <p><strong>G1:</strong> ${data.ketqua["G1"].join(", ")}</p>
-      <p><strong>G2:</strong> ${data.ketqua["G2"].join(", ")}</p>
-      <p><strong>G3:</strong> ${data.ketqua["G3"].join(", ")}</p>
-      <p><strong>G4:</strong> ${data.ketqua["G4"].join(", ")}</p>
-      <p><strong>G5:</strong> ${data.ketqua["G5"].join(", ")}</p>
-      <p><strong>G6:</strong> ${data.ketqua["G6"].join(", ")}</p>
-      <p><strong>G7:</strong> ${data.ketqua["G7"].join(", ")}</p>
-    `;
-  }
+  
+  // Hiển thị thông báo cho user
+  showResultNotification(data);
+  
+  // Cập nhật giao diện kết quả
+  updateResultUI(data);
 });
+
+// Hiển thị thông báo kết quả mới
+function showResultNotification(resultData) {
+  const toast = document.createElement("div");
+  toast.className = "toast-notification";
+  toast.style.background = "#4CAF50";
+  toast.style.color = "white";
+  toast.style.zIndex = "10000";
+  toast.innerHTML = `
+    <div style="font-weight: bold; font-size: 16px;">🎉 KẾT QUẢ XỔ SỐ MỚI</div>
+    <div style="margin: 8px 0;">Đã có kết quả XSMB ngày ${resultData.date}</div>
+    <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 4px;">
+      <strong>Giải ĐB:</strong> ${resultData.ketqua["ĐB"].join(", ")}
+    </div>
+    <small style="display: block; margin-top: 8px;">Nhấn để xem chi tiết</small>
+  `;
+  
+  toast.style.cursor = "pointer";
+  toast.onclick = function() {
+    location.reload();
+    this.remove();
+  };
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 15000);
+}
+
+// Cập nhật giao diện với kết quả mới
+function updateResultUI(resultData) {
+  console.log("🔄 Bắt đầu cập nhật UI với kết quả mới");
+  
+  try {
+    // 1. Cập nhật tiêu đề ngày
+    updateDateTitle(resultData.date);
+    
+    // 2. Xóa thông báo "Chờ quay thưởng" nếu có
+    removeWaitingMessage();
+    
+    // 3. Cập nhật bảng kết quả chính
+    updateResultTable(resultData.ketqua);
+    
+    // 4. Cập nhật thống kê đầu đuôi
+    updateStatistics(resultData.ketqua);
+    
+    console.log("✅ Đã cập nhật giao diện thành công");
+  } catch (error) {
+    console.error("❌ Lỗi khi cập nhật giao diện:", error);
+  }
+}
+
+// Cập nhật tiêu đề ngày
+function updateDateTitle(dateStr) {
+  const titleElements = document.querySelectorAll('.section-title');
+  let targetTitle = null;
+  
+  // Tìm tiêu đề chính (có chứa "Xổ số Miền Bắc")
+  titleElements.forEach(el => {
+    if (el.textContent.includes('Xổ số Miền Bắc')) {
+      targetTitle = el;
+    }
+  });
+  
+  if (targetTitle) {
+    targetTitle.textContent = `Xổ số Miền Bắc ${dateStr}`;
+    console.log("✅ Đã cập nhật tiêu đề:", targetTitle.textContent);
+  } else {
+    console.log("❌ Không tìm thấy tiêu đề để cập nhật");
+  }
+}
+
+// Xóa thông báo "Chờ quay thưởng"
+function removeWaitingMessage() {
+  const waitingElements = document.querySelectorAll('p.section-title');
+  waitingElements.forEach(el => {
+    if (el.textContent.includes('Chưa có kết quả') || el.textContent.includes('Chờ quay thưởng')) {
+      el.remove();
+      console.log("✅ Đã xóa thông báo chờ kết quả");
+    }
+  });
+}
+
+// Cập nhật bảng kết quả - PHIÊN BẢN SỬA LỖI
+// Cập nhật bảng kết quả - PHIÊN BẢN SỬA LỖI HOÀN TOÀN
+function updateResultTable(ketqua) {
+  console.log("🔄 Bắt đầu cập nhật bảng kết quả:", ketqua);
+  
+  const table = document.querySelector('.bang-kq');
+  if (!table) {
+    console.log("❌ Không tìm thấy bảng kết quả");
+    return;
+  }
+  
+  const rows = table.querySelectorAll('tr');
+  let updatedCount = 0;
+  
+  // Map các giải từ text sang key
+  const giaiMap = {
+    'ĐB': 'ĐB',
+    'G1': 'G1', 
+    'G2': 'G2',
+    'G3': 'G3',
+    'G4': 'G4',
+    'G5': 'G5',
+    'G6': 'G6',
+    'G7': 'G7'
+  };
+  
+  rows.forEach(row => {
+    const giaiCell = row.querySelector('td.giai');
+    if (giaiCell) {
+      const giaiText = giaiCell.textContent.trim();
+      const giaiKey = giaiMap[giaiText];
+      
+      console.log(`🔍 Đang xử lý giải: "${giaiText}" -> key: "${giaiKey}"`);
+      
+      // Kiểm tra xem giải này có trong dữ liệu mới không
+      if (giaiKey && ketqua[giaiKey] && Array.isArray(ketqua[giaiKey])) {
+        const soContainer = row.querySelector('.so-container');
+        if (soContainer) {
+          console.log(`✅ Tìm thấy container cho giải ${giaiKey}`, ketqua[giaiKey]);
+          
+          // Xóa số cũ
+          soContainer.innerHTML = '';
+          
+          // Thêm số mới với hiệu ứng
+          ketqua[giaiKey].forEach((so, index) => {
+            const soElement = document.createElement('div');
+            soElement.className = `so ${giaiKey === 'ĐB' || giaiKey === 'G7' ? 'do' : ''}`;
+            soElement.textContent = so;
+            
+            // Thêm hiệu ứng xuất hiện
+            soElement.style.opacity = '0';
+            soElement.style.transform = 'scale(0.8)';
+            soElement.style.transition = 'all 0.3s ease';
+            
+            soContainer.appendChild(soElement);
+            
+            // Kích hoạt hiệu ứng
+            setTimeout(() => {
+              soElement.style.opacity = '1';
+              soElement.style.transform = 'scale(1)';
+            }, index * 100);
+          });
+          
+          // Cập nhật class container cho 6 số
+          if (ketqua[giaiKey].length === 6) {
+            soContainer.classList.add('so-container-6');
+          } else {
+            soContainer.classList.remove('so-container-6');
+          }
+          
+          updatedCount++;
+          console.log(`✅ Đã cập nhật giải ${giaiKey}:`, ketqua[giaiKey]);
+        } else {
+          console.log(`❌ Không tìm thấy so-container cho giải ${giaiKey}`);
+        }
+      } else {
+        console.log(`⚠️ Không có dữ liệu cho giải ${giaiKey} hoặc không hợp lệ`);
+      }
+    }
+  });
+  
+  console.log(`✅ Đã cập nhật ${updatedCount} giải`);
+  return updatedCount > 0;
+}
+
+// Cập nhật thống kê đầu đuôi - PHIÊN BẢN SỬA LỖI
+function updateStatistics(ketqua) {
+  console.log("🔄 Bắt đầu cập nhật thống kê");
+  
+  // Tính toán thống kê mới
+  const thongKe = calculateStatistics(ketqua);
+  
+  // Cập nhật bảng thống kê
+  updateStatisticsTable(thongKe);
+}
+
+// Tính toán thống kê từ kết quả
+function calculateStatistics(ketqua) {
+  const thongKe = { 
+    '0': [], '1': [], '2': [], '3': [], '4': [], 
+    '5': [], '6': [], '7': [], '8': [], '9': [] 
+  };
+  
+  for (const [giai, danh_sach] of Object.entries(ketqua)) {
+    for (const so of danh_sach) {
+      if (so && so.length >= 2) {
+        const hai_so_cuoi = so.slice(-2);
+        const dau = hai_so_cuoi[0];
+        const duoi = hai_so_cuoi[1];
+        if (dau in thongKe) {
+          thongKe[dau].push(duoi);
+        }
+      }
+    }
+  }
+  
+  return thongKe;
+}
+
+// Cập nhật bảng thống kê
+function updateStatisticsTable(thongKe) {
+  const thongKeTable = document.querySelector('.bang-kq-thongke tbody');
+  if (!thongKeTable) {
+    console.log("❌ Không tìm thấy bảng thống kê");
+    return;
+  }
+  
+  // Xóa nội dung cũ
+  thongKeTable.innerHTML = '';
+  
+  // Thêm nội dung mới
+  for (const [dau, duois] of Object.entries(thongKe)) {
+    const row = document.createElement('tr');
+    
+    // Ô đầu
+    const dauCell = document.createElement('td');
+    dauCell.className = 'giai';
+    dauCell.textContent = dau;
+    
+    // Ô đuôi
+    const duoiCell = document.createElement('td');
+    const soContainer = document.createElement('div');
+    soContainer.className = 'so-container-nho';
+    
+    // Thêm các số đuôi
+    duois.forEach(duoi => {
+      const soElement = document.createElement('div');
+      soElement.className = 'so-nho';
+      soElement.textContent = duoi;
+      soContainer.appendChild(soElement);
+    });
+    
+    duoiCell.appendChild(soContainer);
+    
+    row.appendChild(dauCell);
+    row.appendChild(duoiCell);
+    thongKeTable.appendChild(row);
+  }
+  
+  console.log("✅ Đã cập nhật bảng thống kê");
+}
+
+// Thêm hàm debug để kiểm tra
+function debugCurrentResults() {
+  console.log("=== DEBUG CURRENT RESULTS ===");
+  
+  // Kiểm tra bảng kết quả hiện tại
+  const table = document.querySelector('.bang-kq');
+  if (table) {
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+      const giaiCell = row.querySelector('td.giai');
+      if (giaiCell) {
+        const giai = giaiCell.textContent.trim();
+        const soContainer = row.querySelector('.so-container');
+        const numbers = soContainer ? Array.from(soContainer.querySelectorAll('.so')).map(so => so.textContent) : [];
+        console.log(`Giải ${giai}:`, numbers);
+      }
+    });
+  }
+  
+  // Kiểm tra bảng thống kê hiện tại
+  const thongKeTable = document.querySelector('.bang-kq-thongke tbody');
+  if (thongKeTable) {
+    console.log("Bảng thống kê hiện tại có", thongKeTable.children.length, "hàng");
+  }
+}
+
+// Gọi hàm debug khi cần
+// debugCurrentResults();
 
 socket.on("connect_error", err => console.log("Socket connection error:", err));
 let currentChatPeer = null;

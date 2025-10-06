@@ -1,8 +1,77 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-def phan_tich_cham(collection, so_ngay=7):
-    data = get_last_days(collection, so_ngay)
+def normalize_data_source(data_source):
+    """
+    Chuyển collection Mongo hoặc list thành list dict chuẩn, có 'date' và 'ketqua'.
+    """
+    if hasattr(data_source, "find"):  # kiểm tra nếu là collection
+        docs = list(data_source.find({}))
+    elif isinstance(data_source, list):
+        docs = data_source
+    else:
+        raise ValueError("data_source phải là collection hoặc list dict")
+    
+    # Thêm date_obj nếu cần để sort
+    for d in docs:
+        try:
+            d["date_obj"] = datetime.strptime(d["date"], "%d-%m-%Y")
+        except:
+            d["date_obj"] = None
+    # Loại bỏ doc lỗi ngày
+    docs = [d for d in docs if d["date_obj"]]
+    return docs
+
+def get_last_days(data_source, so_ngay=7):
+    """
+    Lấy dữ liệu các ngày gần nhất, hỗ trợ cả collection và list
+    """
+    # Sử dụng hàm normalize_data_source để xử lý cả collection và list
+    docs = normalize_data_source(data_source)
+    
+    # Sort theo ngày giảm dần (mới nhất trước)
+    docs = sorted(docs, key=lambda x: x["date_obj"], reverse=True)
+    
+    # Trả về số ngày gần nhất
+    return docs[:so_ngay]
+
+def get_all_last_two_digits(ketqua_dict):
+    """
+    Lấy tất cả 2 số cuối từ kết quả xổ số
+    """
+    last_two_digits = []
+    for values in ketqua_dict.values():
+        if isinstance(values, list):
+            for v in values:
+                if len(v) >= 2:
+                    last_two_digits.append(v[-2:])
+        else:
+            if len(values) >= 2:
+                last_two_digits.append(values[-2:])
+    return last_two_digits
+
+def has_valid_ketqua(doc):
+    """Kiểm tra xem document có kết quả hợp lệ không (không chứa '...' hoặc rỗng)"""
+    if not doc or not doc.get("ketqua"):
+        return False
+    
+    ketqua = doc.get("ketqua", {})
+    
+    # Kiểm tra xem có ít nhất một giải có dữ liệu hợp lệ không
+    for values in ketqua.values():
+        if isinstance(values, list):
+            for v in values:
+                # Kiểm tra nếu giá trị không rỗng, không phải "...", và có độ dài >= 2
+                if v and v != "..." and len(v) >= 2 and v.strip():
+                    return True
+        else:
+            # Kiểm tra giá trị đơn
+            if values and values != "..." and len(values) >= 2 and values.strip():
+                return True
+    return False
+
+def phan_tich_cham(data_source, so_ngay=7):
+    data = get_last_days(data_source, so_ngay)
     valid_data = [d for d in data if d.get("ketqua")]
 
     if not valid_data:
@@ -62,12 +131,12 @@ def phan_tich_cham(collection, so_ngay=7):
         "date_range": date_range
     }
 
-def phan_tich_tong_lo(collection):
+def phan_tich_tong_lo(data_source):
     today = datetime.today()
     start_date = today - timedelta(days=7)
     start_str = start_date.strftime("%d-%m-%Y")
 
-    data = list(collection.find())
+    data = get_last_days(data_source, 7)  # Sử dụng get_last_days thay vì trực tiếp
     data = [d for d in data if datetime.strptime(d["date"], "%d-%m-%Y") >= datetime.strptime(start_str, "%d-%m-%Y")]
     data.sort(key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"), reverse=True)
 
@@ -98,10 +167,8 @@ def phan_tich_tong_lo(collection):
 
     return ket_qua_theo_ngay
 
-from datetime import datetime
-
-def phan_tich_lo_roi(collection, so_ngay=100):
-    data = get_last_days(collection, so_ngay)
+def phan_tich_lo_roi(data_source, so_ngay=100):
+    data = get_last_days(data_source, so_ngay)
     data.sort(key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"))
 
     roi_db_days = []      
@@ -259,69 +326,13 @@ def phan_tich_lo_roi(collection, so_ngay=100):
         "ung_vien": ung_vien
     }
 
-
-def get_last_days(collection, so_ngay=7):
-    # Lấy toàn bộ dữ liệu
-    docs = list(collection.find({}))
-    
-    # Thêm field date_obj để sort
-    for d in docs:
-        try:
-            d["date_obj"] = datetime.strptime(d["date"], "%d-%m-%Y")
-        except:
-            d["date_obj"] = None
-    
-    # Bỏ doc lỗi ngày
-    docs = [d for d in docs if d["date_obj"]]
-
-    # Sort theo ngày giảm dần (mới nhất trước)
-    docs = sorted(docs, key=lambda x: x["date_obj"], reverse=True)
-    
-    # Trả về 7 ngày gần nhất
-    return docs[:so_ngay]
-
-def get_all_last_two_digits(ketqua_dict):
-    """
-    Lấy tất cả 2 số cuối từ kết quả xổ số
-    """
-    last_two_digits = []
-    for values in ketqua_dict.values():
-        if isinstance(values, list):
-            for v in values:
-                if len(v) >= 2:
-                    last_two_digits.append(v[-2:])
-        else:
-            if len(values) >= 2:
-                last_two_digits.append(values[-2:])
-    return last_two_digits
-
-def has_valid_ketqua(doc):
-    """Kiểm tra xem document có kết quả hợp lệ không (không chứa '...' hoặc rỗng)"""
-    if not doc or not doc.get("ketqua"):
-        return False
-    
-    ketqua = doc.get("ketqua", {})
-    
-    # Kiểm tra xem có ít nhất một giải có dữ liệu hợp lệ không
-    for values in ketqua.values():
-        if isinstance(values, list):
-            for v in values:
-                # Kiểm tra nếu giá trị không rỗng, không phải "...", và có độ dài >= 2
-                if v and v != "..." and len(v) >= 2 and v.strip():
-                    return True
-        else:
-            # Kiểm tra giá trị đơn
-            if values and values != "..." and len(values) >= 2 and values.strip():
-                return True
-    return False
-
-def phan_tich_cau_ngang(collection, so_ngay=7):
+def phan_tich_cau_ngang(data_source, so_ngay=7):
     """
     Phân tích Cầu Ngang - kiểm tra ĐÚNG: cặp số vị trí X ngày hôm trước có trong KẾT QUẢ ngày hôm sau
     """
     try:
         # Lấy dữ liệu các ngày
-        data = get_last_days(collection, so_ngay + 3)
+        data = get_last_days(data_source, so_ngay + 3)
         
         # Lọc chỉ những ngày có kết quả hợp lệ
         valid_data = [d for d in data if has_valid_ketqua(d)]
@@ -416,7 +427,6 @@ def phan_tich_cau_ngang(collection, so_ngay=7):
                 final_caus.append({
                     "source": cau_info['source'],
                     "final": cau_info['last_cap'],
-                    
                     "history": cau_info['history'],
                     "so_ngay": cau_info['so_ngay']
                 })
@@ -479,13 +489,13 @@ def extract_all_caps(day_data):
     
     return caps
 
-def phan_tich_cau_cheo(collection, so_ngay=7):
+def phan_tich_cau_cheo(data_source, so_ngay=7):
     """
     Phân tích cầu chéo - bỏ qua ngày chưa có kết quả đầy đủ
     """
     try:
         # Lấy 10 ngày gần nhất để đảm bảo có đủ 7 ngày có dữ liệu
-        data = get_last_days(collection, so_ngay + 3)
+        data = get_last_days(data_source, so_ngay + 3)
         
         # Lọc chỉ những ngày có kết quả hợp lệ (không chứa "..." hoặc rỗng)
         valid_data = [d for d in data if has_valid_ketqua(d)]
@@ -611,7 +621,6 @@ def phan_tich_cau_cheo(collection, so_ngay=7):
                                             seen.add(key)
                                             final_result = {
                                                 "final": final_cap,
-                                                
                                                 "history": list(zip(cau['days'], cau['pairs'])),
                                                 "source": cau['source']
                                             }
@@ -648,14 +657,13 @@ def group_cau_by_number(cau_list):
     # Trả về dạng [{"num": "97", "caus": [c1, c2,...]}, ...]
     return [{"num": num, "caus": caus} for num, caus in grouped.items()]
 
-
-def phan_tich_theo_thu(collection, so_ngay=30):
+def phan_tich_theo_thu(data_source, so_ngay=30):
     """
     Phân tích XSMB theo thứ - CHỈ quan tâm có về hay không trong ngày
     """
     try:
         # Lấy 30 ngày gần nhất
-        data = get_last_days(collection, so_ngay)
+        data = get_last_days(data_source, so_ngay)
         data.reverse()
 
         thu_labels = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"]
@@ -742,12 +750,12 @@ def phan_tich_theo_thu(collection, so_ngay=30):
         traceback.print_exc()
         return {}
 
-def phan_tich_lap_deu_chi_tiet(collection, so_ngay=30, gioi_han_ngay=7):
+def phan_tich_lap_deu_chi_tiet(data_source, so_ngay=30, gioi_han_ngay=7):
     """
     Phân tích chi tiết chu kỳ các số
     """
     try:
-        data = get_last_days(collection, so_ngay)
+        data = get_last_days(data_source, so_ngay)
         data.reverse()  # đảo lại theo ngày tăng dần (từ cũ → mới)
 
         if not data:
