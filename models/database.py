@@ -41,19 +41,22 @@ def init_db():
 def get_db(source=None):
     global db, db_atlas
 
-    # Nếu được chỉ định rõ, ưu tiên cái đó
+    # Nếu chỉ định rõ thì trả đúng cái đó
     if source == "local":
         if db is None:
-            raise Exception("⚠️ Database local chưa được khởi tạo. Hãy gọi init_db() trước.")
+            raise Exception("⚠️ Database local chưa được khởi tạo. Gọi init_db() trước.")
         return db
     elif source == "atlas":
         if db_atlas is None:
-            raise Exception("⚠️ Database Atlas chưa được khởi tạo. Hãy gọi init_db() trước.")
+            raise Exception("⚠️ Database Atlas chưa được khởi tạo. Gọi init_db() trước.")
         return db_atlas
 
-    # Nếu không chỉ định, tự động chọn theo môi trường
-    if os.getenv("RENDER", "false").lower() == "true":
-        # đang chạy trên Render → dùng Atlas
+    # Nếu không chỉ định, tự động chọn Atlas nếu có, ngược lại chọn local
+    # ✅ Sửa lại ở đây — dùng is not None thay vì if db
+    if db_atlas is not None:
         return db_atlas
-
+    elif db is not None:
+        return db
+    else:
+        raise Exception("⚠️ Không có database nào được khởi tạo. Gọi init_db() trước.")
     # đang chạy local
