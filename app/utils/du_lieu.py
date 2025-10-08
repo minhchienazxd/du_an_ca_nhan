@@ -9,7 +9,7 @@ from app.utils.crawl import fetch_and_save_data
 from models.database import init_db # 👈 thêm import này
 
 if __name__ == "__main__":
-    ngay_can_lay = "3-10-2025"
+    ngay_can_lay = "07-10-2025"
     print(f"📅 Bắt đầu lấy dữ liệu XSMB ngày {ngay_can_lay} ...")
     try:
         init_db()  # 👈 khởi tạo database trước khi gọi fetch

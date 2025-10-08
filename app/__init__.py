@@ -1,7 +1,7 @@
 from flask import Flask
-from models.database import init_db
+from models.database import init_db, get_db
 from routes import index, tk_pt, dang_nhap, nap_rut_ls, admin, ghi_lo, du_doan
-from app.utils.crawl import get_db
+
 from flask_socketio import SocketIO
 from sockets.like_cmt_post_socket import register_feed_events
 from sockets.messages_socket import register_friend_events
