@@ -38,15 +38,22 @@ def init_db():
     except Exception as e:
         print("❌ Lỗi kết nối MongoDB:", e)
         raise e
-def get_db(source="local"):
+def get_db(source=None):
     global db, db_atlas
+
+    # Nếu được chỉ định rõ, ưu tiên cái đó
     if source == "local":
         if db is None:
-            raise Exception("⚠️ Database chưa được khởi tạo. Hãy gọi init_db() trước.")
+            raise Exception("⚠️ Database local chưa được khởi tạo. Hãy gọi init_db() trước.")
         return db
     elif source == "atlas":
         if db_atlas is None:
             raise Exception("⚠️ Database Atlas chưa được khởi tạo. Hãy gọi init_db() trước.")
         return db_atlas
-    else:
-        raise Exception("⚠️ Nguồn dữ liệu không hợp lệ.")
+
+    # Nếu không chỉ định, tự động chọn theo môi trường
+    if os.getenv("RENDER", "false").lower() == "true":
+        # đang chạy trên Render → dùng Atlas
+        return db_atlas
+
+    # đang chạy local
